@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>Загрузка Excel — PartPostCrimea</title>
+  <style>
+    body { font-family: system-ui, Arial, sans-serif; background: #f5f7fa; padding: 40px; }
+    .container { max-width: 600px; margin: 0 auto; background: white; padding: 32px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
+    h1 { margin-top: 0; color: #222; }
+    p { color: #555; line-height: 1.5; }
+    
+    .file-upload-wrapper { position: relative; overflow: hidden; display: inline-block; }
+    input[type="file"] { position: absolute; left: 0; top: 0; opacity: 0; width: 100%; height: 100%; cursor: pointer; }
+    .btn-file { background-color: #3b82f6; color: white; border: none; padding: 12px 24px; border-radius: 8px; cursor: pointer; font-weight: 500; }
+    .btn-primary { background-color: #10b981; color: white; border: none; padding: 12px 24px; border-radius: 8px; cursor: pointer; font-weight: 500; margin-left: 16px; white-space: nowrap; }
+    .flash { padding: 12px; margin-bottom: 16px; border-radius: 6px; }
+    .flash-success { background: #d1fae5; color: #065f46; }
+    .flash-error { background: #fee2e2; color: #b91c1c; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Загрузка Excel с отправлениями</h1>
+    <p>Выберите файл .xlsx или .xls, чтобы добавить данные в систему.</p>
+
+    <!-- Flash-сообщения (если были ошибки/успех) -->
+    <div class="flash-messages">
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+          {% for category, message in messages %}
+            <div class="flash flash-{{ category }}">{{ message }}</div>
+          {% endfor %}
+        {% endif %}
+      {% endwith %}
+    </div>
+
+    <!-- Форма загрузки -->
+    <form action="/upload" method="post" enctype="multipart/form-data">
+      <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+        <div class="file-upload-wrapper">
+          <input type="file" name="file" accept=".xlsx,.xls" required>
+          <button type="button" class="btn-file">📂 Выбрать файл</button>
+        </div>
+        <span style="color: #666; font-size: 0.9rem;">Поддерживаются .xlsx и .xls</span>
+        <button type="submit" class="btn-primary">🚀 Загрузить данные</button>
+      </div>
+    </form>
+
+    <p style="margin-top: 24px; font-size: 0.85rem; color: #888;">
+      После загрузки вы будете перенаправлены на главную страницу с таблицей.
+    </p>
+  </div>
+</body>
+</html>
