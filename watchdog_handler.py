@@ -12,22 +12,46 @@ from excel_processor import process_xlsx_file
 from upload_status import update_job_by_path
 
 
+# ============================================================
+# НАСТРОЙКИ
+# ============================================================
+
 EXCEL_EXTENSIONS = {
     ".xlsx",
     ".xls",
 }
 
-
+# Через сколько секунд после события начинать проверку.
 PROCESS_DELAY = 2.0
 
+# Максимальное время ожидания готовности файла.
 FILE_READY_TIMEOUT = 120.0
 
+# Интервал проверки размера файла.
 FILE_READY_CHECK_INTERVAL = 0.5
 
-STABLE_CHECKS_REQUIRED = 3
+# Сколько раз подряд размер должен оставаться одинаковым.
+STABLE_CHECKS_REQUIRED = 4
 
 
 class XlsxUploadHandler(FileSystemEventHandler):
+    """
+    Watchdog для папки uploads.
+
+    Схема:
+
+        upload
+           ↓
+        uploads/
+           ↓
+        watchdog
+           ↓
+        проверка готовности
+           ↓
+        process_xlsx_file()
+           ↓
+        SQLite
+    """
 
     def __init__(
         self,
@@ -46,10 +70,14 @@ class XlsxUploadHandler(FileSystemEventHandler):
 
         self._timers: dict[
             str,
-            threading.Timer
+            threading.Timer,
         ] = {}
 
         self._lock = threading.RLock()
+
+    # ========================================================
+    # ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ
+    # ========================================================
 
     @staticmethod
     def _normalize_path(
@@ -76,25 +104,42 @@ class XlsxUploadHandler(FileSystemEventHandler):
             in EXCEL_EXTENSIONS
         )
 
+    # ========================================================
+    # ПЛАНИРОВАНИЕ ОБРАБОТКИ
+    # ========================================================
+
     def _schedule_processing(
         self,
         file_path: str,
     ) -> None:
 
         normalized_path = (
-            self._normalize_path(file_path)
+            self._normalize_path(
+                file_path
+            )
         )
 
         with self._lock:
 
+            # Уже обработан
             if (
                 normalized_path
                 in self._processed_files
             ):
                 return
 
-            old_timer = self._timers.get(
+            # Уже находится в обработке
+            if (
                 normalized_path
+                in self._processing_files
+            ):
+                return
+
+            # Отменяем старый таймер
+            old_timer = (
+                self._timers.get(
+                    normalized_path
+                )
             )
 
             if old_timer is not None:
@@ -117,7 +162,7 @@ class XlsxUploadHandler(FileSystemEventHandler):
         update_job_by_path(
             normalized_path,
             "waiting",
-            "Файл обнаружен. Ожидание окончания копирования...",
+            "Файл обнаружен. Ожидание окончания загрузки...",
         )
 
         print(
@@ -125,27 +170,44 @@ class XlsxUploadHandler(FileSystemEventHandler):
             f"{normalized_path}"
         )
 
+    # ========================================================
+    # ПРОВЕРКА ГОТОВНОСТИ ФАЙЛА
+    # ========================================================
+
     def _wait_until_ready(
         self,
         file_path: str,
-    ) -> bool:
+    ) -> tuple[bool, str]:
+        """
+        Ждём, пока файл полностью скопируется.
 
-        started = time.time()
+        Возвращает:
+
+            (True, "")
+            или
+            (False, "текст ошибки")
+        """
+
+        started_at = time.monotonic()
 
         previous_size: int | None = None
 
         stable_checks = 0
 
         while (
-            time.time() - started
+            time.monotonic() - started_at
             < FILE_READY_TIMEOUT
         ):
 
             try:
 
-                if not os.path.isfile(
+                path = Path(
                     file_path
-                ):
+                )
+
+                if not path.exists():
+
+                    stable_checks = 0
 
                     time.sleep(
                         FILE_READY_CHECK_INTERVAL
@@ -153,10 +215,15 @@ class XlsxUploadHandler(FileSystemEventHandler):
 
                     continue
 
-                current_size = (
-                    os.path.getsize(
-                        file_path
+                if not path.is_file():
+
+                    return (
+                        False,
+                        "Путь не является файлом",
                     )
+
+                current_size = (
+                    path.stat().st_size
                 )
 
                 if current_size <= 0:
@@ -173,6 +240,7 @@ class XlsxUploadHandler(FileSystemEventHandler):
 
                     continue
 
+                # Размер не изменился
                 if (
                     previous_size
                     == current_size
@@ -186,13 +254,15 @@ class XlsxUploadHandler(FileSystemEventHandler):
 
                 previous_size = current_size
 
+                # Проверяем возможность открыть файл
                 try:
 
                     with open(
-                        file_path,
+                        path,
                         "rb",
-                    ):
-                        pass
+                    ) as file:
+
+                        file.read(1)
 
                 except (
                     PermissionError,
@@ -207,12 +277,16 @@ class XlsxUploadHandler(FileSystemEventHandler):
 
                     continue
 
+                # Файл стабилен
                 if (
                     stable_checks
                     >= STABLE_CHECKS_REQUIRED
                 ):
 
-                    return True
+                    return (
+                        True,
+                        "",
+                    )
 
             except FileNotFoundError:
 
@@ -237,7 +311,17 @@ class XlsxUploadHandler(FileSystemEventHandler):
                 FILE_READY_CHECK_INTERVAL
             )
 
-        return False
+        return (
+            False,
+            (
+                "Файл не стал доступен "
+                f"за {FILE_READY_TIMEOUT:.0f} секунд"
+            ),
+        )
+
+    # ========================================================
+    # ОБРАБОТКА
+    # ========================================================
 
     def _process_file_safe(
         self,
@@ -269,19 +353,81 @@ class XlsxUploadHandler(FileSystemEventHandler):
 
         try:
 
+            print(
+                "[WATCHDOG] Проверка файла: "
+                f"{file_path}"
+            )
+
             update_job_by_path(
                 file_path,
                 "waiting",
                 "Проверка готовности файла...",
             )
 
-            if not self._wait_until_ready(
+            # ------------------------------------------------
+            # Ждём окончания копирования
+            # ------------------------------------------------
+
+            ready, ready_message = (
+                self._wait_until_ready(
+                    file_path
+                )
+            )
+
+            if not ready:
+
+                update_job_by_path(
+                    file_path,
+                    "error",
+                    ready_message,
+                )
+
+                print(
+                    "[WATCHDOG] Ошибка готовности: "
+                    f"{ready_message}"
+                )
+
+                return
+
+            # ------------------------------------------------
+            # Файл готов
+            # ------------------------------------------------
+
+            update_job_by_path(
+                file_path,
+                "processing",
+                "Файл готов. Начинается обработка...",
+            )
+
+            print(
+                "[WATCHDOG] Начало обработки: "
+                f"{file_path}"
+            )
+
+            # ------------------------------------------------
+            # Передаём существующему processor
+            # ------------------------------------------------
+
+            result = process_xlsx_file(
                 file_path
+            )
+
+            # ------------------------------------------------
+            # Проверяем результат processor
+            # ------------------------------------------------
+
+            if (
+                not isinstance(
+                    result,
+                    tuple,
+                )
+                or len(result) != 2
             ):
 
                 message = (
-                    "Файл не стал доступен "
-                    f"за {FILE_READY_TIMEOUT:.0f} сек."
+                    "excel_processor.py "
+                    "вернул неправильный результат. "
+                    "Ожидалось: (success, message)"
                 )
 
                 update_job_by_path(
@@ -292,27 +438,21 @@ class XlsxUploadHandler(FileSystemEventHandler):
 
                 print(
                     "[WATCHDOG] "
-                    f"{message} {file_path}"
+                    f"{message}"
                 )
 
                 return
 
-            update_job_by_path(
-                file_path,
-                "processing",
-                "Файл обрабатывается...",
+            success, message = result
+
+            message = str(
+                message
+                or ""
             )
 
-            print(
-                "[WATCHDOG] Начало обработки: "
-                f"{file_path}"
-            )
-
-            success, message = (
-                process_xlsx_file(
-                    file_path
-                )
-            )
+            # ------------------------------------------------
+            # УСПЕХ
+            # ------------------------------------------------
 
             if success:
 
@@ -325,31 +465,54 @@ class XlsxUploadHandler(FileSystemEventHandler):
                 update_job_by_path(
                     file_path,
                     "completed",
-                    message,
+                    message
+                    or "Файл успешно обработан",
                 )
 
                 print(
-                    "[WATCHDOG] Успешно обработан: "
+                    "[WATCHDOG] "
+                    "✓ Успешно обработан: "
                     f"{file_path}"
                 )
+
+                print(
+                    "[WATCHDOG] Результат: "
+                    f"{message}"
+                )
+
+            # ------------------------------------------------
+            # ОШИБКА ОБРАБОТКИ
+            # ------------------------------------------------
 
             else:
 
                 update_job_by_path(
                     file_path,
                     "error",
-                    message,
+                    message
+                    or "excel_processor вернул ошибку",
                 )
 
                 print(
-                    "[WATCHDOG] Ошибка обработки: "
+                    "[WATCHDOG] "
+                    "✗ Ошибка обработки: "
+                    f"{file_path}"
+                )
+
+                print(
+                    "[WATCHDOG] Причина: "
                     f"{message}"
                 )
+
+        # ====================================================
+        # ОШИБКИ ДОСТУПА
+        # ====================================================
 
         except PermissionError as error:
 
             message = (
-                f"Нет доступа к файлу: {error}"
+                "Нет доступа к файлу: "
+                f"{error}"
             )
 
             update_job_by_path(
@@ -359,14 +522,20 @@ class XlsxUploadHandler(FileSystemEventHandler):
             )
 
             print(
-                "[WATCHDOG] "
+                "[WATCHDOG] ✗ "
                 f"{message}"
             )
 
-        except FileNotFoundError:
+        # ====================================================
+        # ФАЙЛ УДАЛЁН
+        # ====================================================
+
+        except FileNotFoundError as error:
 
             message = (
-                "Файл был удалён до завершения обработки."
+                "Файл был удалён "
+                "до завершения обработки: "
+                f"{error}"
             )
 
             update_job_by_path(
@@ -376,14 +545,19 @@ class XlsxUploadHandler(FileSystemEventHandler):
             )
 
             print(
-                "[WATCHDOG] "
+                "[WATCHDOG] ✗ "
                 f"{message}"
             )
+
+        # ====================================================
+        # ЛЮБАЯ ДРУГАЯ ОШИБКА
+        # ====================================================
 
         except Exception as error:
 
             message = (
-                f"Критическая ошибка: {error}"
+                f"{type(error).__name__}: "
+                f"{error}"
             )
 
             update_job_by_path(
@@ -393,7 +567,16 @@ class XlsxUploadHandler(FileSystemEventHandler):
             )
 
             print(
-                "[WATCHDOG] "
+                "[WATCHDOG] ✗ Критическая ошибка"
+            )
+
+            print(
+                "[WATCHDOG] Файл: "
+                f"{file_path}"
+            )
+
+            print(
+                "[WATCHDOG] Ошибка: "
                 f"{message}"
             )
 
@@ -404,6 +587,10 @@ class XlsxUploadHandler(FileSystemEventHandler):
                 self._processing_files.discard(
                     file_path
                 )
+
+    # ========================================================
+    # СОЗДАНИЕ ФАЙЛА
+    # ========================================================
 
     def on_created(
         self,
@@ -421,6 +608,10 @@ class XlsxUploadHandler(FileSystemEventHandler):
         self._schedule_processing(
             event.src_path
         )
+
+    # ========================================================
+    # ИЗМЕНЕНИЕ ФАЙЛА
+    # ========================================================
 
     def on_modified(
         self,
@@ -459,6 +650,10 @@ class XlsxUploadHandler(FileSystemEventHandler):
             event.src_path
         )
 
+    # ========================================================
+    # ПЕРЕМЕЩЕНИЕ ФАЙЛА
+    # ========================================================
+
     def on_moved(
         self,
         event,
@@ -485,6 +680,10 @@ class XlsxUploadHandler(FileSystemEventHandler):
             destination
         )
 
+    # ========================================================
+    # УДАЛЕНИЕ ФАЙЛА
+    # ========================================================
+
     def on_deleted(
         self,
         event,
@@ -501,31 +700,56 @@ class XlsxUploadHandler(FileSystemEventHandler):
 
         with self._lock:
 
-            timer = self._timers.pop(
-                normalized_path,
-                None,
+            timer = (
+                self._timers.pop(
+                    normalized_path,
+                    None,
+                )
             )
 
-            if timer:
+            if timer is not None:
                 timer.cancel()
-
-            self._processed_files.discard(
-                normalized_path
-            )
 
             self._processing_files.discard(
                 normalized_path
             )
 
+            # ВАЖНО:
+            #
+            # Не удаляем processed_files.
+            #
+            # excel_processor.py сам удаляет
+            # успешно обработанный Excel.
+            #
+            # Если удалить запись здесь,
+            # последующие события могут
+            # снова поставить файл в очередь.
+
+    # ========================================================
+    # ОСТАНОВКА
+    # ========================================================
+
     def stop(self) -> None:
 
         with self._lock:
 
-            for timer in self._timers.values():
-                timer.cancel()
+            timers = list(
+                self._timers.values()
+            )
 
             self._timers.clear()
 
+        for timer in timers:
+
+            try:
+                timer.cancel()
+            except Exception:
+                pass
+
+
+# ============================================================
+# ЗАПУСК WATCHDOG
+# ============================================================
 
 def start_watchdog(
     upload_folder: str | os.PathLike[str],
@@ -540,8 +764,10 @@ def start_watchdog(
         exist_ok=True,
     )
 
-    event_handler = XlsxUploadHandler(
-        upload_path
+    event_handler = (
+        XlsxUploadHandler(
+            upload_path
+        )
     )
 
     observer = Observer()
@@ -555,8 +781,25 @@ def start_watchdog(
     observer.start()
 
     print(
-        "[WATCHDOG] Мониторинг запущен: "
+        "[WATCHDOG] =================================="
+    )
+
+    print(
+        "[WATCHDOG] Мониторинг запущен"
+    )
+
+    print(
+        "[WATCHDOG] Папка: "
         f"{upload_path}"
+    )
+
+    print(
+        "[WATCHDOG] Поддерживаемые файлы: "
+        ".xlsx, .xls"
+    )
+
+    print(
+        "[WATCHDOG] =================================="
     )
 
     return observer
