@@ -1,54 +1,911 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-  <meta charset="UTF-8">
-  <title>Загрузка Excel — PartPostCrimea</title>
-  <style>
-    body { font-family: system-ui, Arial, sans-serif; background: #f5f7fa; padding: 40px; }
-    .container { max-width: 600px; margin: 0 auto; background: white; padding: 32px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
-    h1 { margin-top: 0; color: #222; }
-    p { color: #555; line-height: 1.5; }
-    
-    .file-upload-wrapper { position: relative; overflow: hidden; display: inline-block; }
-    input[type="file"] { position: absolute; left: 0; top: 0; opacity: 0; width: 100%; height: 100%; cursor: pointer; }
-    .btn-file { background-color: #3b82f6; color: white; border: none; padding: 12px 24px; border-radius: 8px; cursor: pointer; font-weight: 500; }
-    .btn-primary { background-color: #10b981; color: white; border: none; padding: 12px 24px; border-radius: 8px; cursor: pointer; font-weight: 500; margin-left: 16px; white-space: nowrap; }
-    .flash { padding: 12px; margin-bottom: 16px; border-radius: 6px; }
-    .flash-success { background: #d1fae5; color: #065f46; }
-    .flash-error { background: #fee2e2; color: #b91c1c; }
-  </style>
-</head>
-<body>
-  <div class="container">
-    <h1>Загрузка Excel с отправлениями</h1>
-    <p>Выберите файл .xlsx или .xls, чтобы добавить данные в систему.</p>
+    <meta charset="UTF-8">
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
 
-    <!-- Flash-сообщения (если были ошибки/успех) -->
-    <div class="flash-messages">
-      {% with messages = get_flashed_messages(with_categories=true) %}
-        {% if messages %}
-          {% for category, message in messages %}
-            <div class="flash flash-{{ category }}">{{ message }}</div>
-          {% endfor %}
-        {% endif %}
-      {% endwith %}
+    <title>Пакетная загрузка Excel — PartPostCrimea</title>
+
+    <style>
+        :root {
+            --primary: #2563eb;
+            --primary-hover: #1d4ed8;
+            --success: #059669;
+            --success-hover: #047857;
+            --danger: #dc2626;
+            --danger-hover: #b91c1c;
+            --warning: #d97706;
+            --text: #1f2937;
+            --muted: #6b7280;
+            --border: #d1d5db;
+            --background: #f3f4f6;
+            --card: #ffffff;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            min-height: 100vh;
+            font-family:
+                system-ui,
+                -apple-system,
+                BlinkMacSystemFont,
+                "Segoe UI",
+                Arial,
+                sans-serif;
+            background: var(--background);
+            color: var(--text);
+        }
+
+        .page {
+            width: 100%;
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 40px 20px;
+        }
+
+        .container {
+            background: var(--card);
+            border-radius: 16px;
+            padding: 32px;
+            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.08);
+        }
+
+        h1 {
+            margin: 0 0 12px;
+            font-size: 28px;
+            color: #111827;
+        }
+
+        .description {
+            margin: 0 0 28px;
+            color: var(--muted);
+            line-height: 1.6;
+        }
+
+        /* -------------------------------------------------
+           Flash-сообщения
+        ------------------------------------------------- */
+
+        .flash-messages {
+            margin-bottom: 20px;
+        }
+
+        .flash {
+            padding: 14px 16px;
+            margin-bottom: 10px;
+            border-radius: 10px;
+            font-size: 14px;
+        }
+
+        .flash-success {
+            color: #065f46;
+            background: #d1fae5;
+            border: 1px solid #a7f3d0;
+        }
+
+        .flash-error {
+            color: #991b1b;
+            background: #fee2e2;
+            border: 1px solid #fecaca;
+        }
+
+        .flash-warning {
+            color: #92400e;
+            background: #fef3c7;
+            border: 1px solid #fde68a;
+        }
+
+        /* -------------------------------------------------
+           Зона Drag & Drop
+        ------------------------------------------------- */
+
+        .drop-zone {
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            min-height: 220px;
+            padding: 30px;
+            border: 2px dashed var(--primary);
+            border-radius: 14px;
+            background: #f8fbff;
+            cursor: pointer;
+            transition:
+                border-color 0.2s ease,
+                background 0.2s ease,
+                transform 0.2s ease;
+        }
+
+        .drop-zone:hover {
+            background: #eff6ff;
+            border-color: var(--primary-hover);
+        }
+
+        .drop-zone.dragover {
+            background: #dbeafe;
+            border-color: var(--primary-hover);
+            transform: scale(1.01);
+        }
+
+        .drop-zone-icon {
+            font-size: 52px;
+            margin-bottom: 12px;
+        }
+
+        .drop-zone-title {
+            font-size: 19px;
+            font-weight: 700;
+            text-align: center;
+            color: #1e3a8a;
+        }
+
+        .drop-zone-text {
+            margin-top: 8px;
+            text-align: center;
+            color: var(--muted);
+            font-size: 14px;
+        }
+
+        #fileInput {
+            display: none;
+        }
+
+        /* -------------------------------------------------
+           Кнопки
+        ------------------------------------------------- */
+
+        .buttons {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            margin-top: 20px;
+        }
+
+        button {
+            appearance: none;
+            border: none;
+            border-radius: 9px;
+            padding: 12px 20px;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            transition:
+                opacity 0.2s ease,
+                transform 0.1s ease,
+                background 0.2s ease;
+        }
+
+        button:hover:not(:disabled) {
+            transform: translateY(-1px);
+        }
+
+        button:disabled {
+            cursor: not-allowed;
+            opacity: 0.55;
+        }
+
+        .btn-select {
+            background: var(--primary);
+            color: white;
+        }
+
+        .btn-select:hover:not(:disabled) {
+            background: var(--primary-hover);
+        }
+
+        .btn-upload {
+            background: var(--success);
+            color: white;
+        }
+
+        .btn-upload:hover:not(:disabled) {
+            background: var(--success-hover);
+        }
+
+        .btn-clear {
+            background: #e5e7eb;
+            color: #374151;
+        }
+
+        .btn-clear:hover:not(:disabled) {
+            background: #d1d5db;
+        }
+
+        .btn-remove {
+            padding: 7px 10px;
+            background: #fee2e2;
+            color: var(--danger);
+            font-size: 13px;
+        }
+
+        .btn-remove:hover {
+            background: #fecaca;
+        }
+
+        /* -------------------------------------------------
+           Список файлов
+        ------------------------------------------------- */
+
+        .files-section {
+            display: none;
+            margin-top: 28px;
+        }
+
+        .files-section.visible {
+            display: block;
+        }
+
+        .files-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 16px;
+            margin-bottom: 12px;
+            flex-wrap: wrap;
+        }
+
+        .files-title {
+            margin: 0;
+            font-size: 20px;
+        }
+
+        .file-counter {
+            padding: 6px 12px;
+            border-radius: 20px;
+            background: #dbeafe;
+            color: #1d4ed8;
+            font-size: 13px;
+            font-weight: 700;
+        }
+
+        .file-list {
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            overflow: hidden;
+            max-height: 420px;
+            overflow-y: auto;
+        }
+
+        .file-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 14px 16px;
+            border-bottom: 1px solid #e5e7eb;
+            background: white;
+        }
+
+        .file-item:last-child {
+            border-bottom: none;
+        }
+
+        .file-item-icon {
+            flex: 0 0 auto;
+            font-size: 24px;
+        }
+
+        .file-info {
+            min-width: 0;
+            flex: 1;
+        }
+
+        .file-name {
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            font-weight: 600;
+        }
+
+        .file-size {
+            margin-top: 4px;
+            color: var(--muted);
+            font-size: 13px;
+        }
+
+        /* -------------------------------------------------
+           Прогресс
+        ------------------------------------------------- */
+
+        .progress-section {
+            display: none;
+            margin-top: 25px;
+        }
+
+        .progress-section.visible {
+            display: block;
+        }
+
+        .progress-info {
+            display: flex;
+            justify-content: space-between;
+            gap: 15px;
+            margin-bottom: 8px;
+            font-size: 14px;
+        }
+
+        .progress-text {
+            color: #374151;
+            font-weight: 600;
+        }
+
+        .progress-percent {
+            color: var(--primary);
+            font-weight: 700;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 12px;
+            overflow: hidden;
+            border-radius: 10px;
+            background: #e5e7eb;
+        }
+
+        .progress-value {
+            width: 0;
+            height: 100%;
+            border-radius: inherit;
+            background: var(--primary);
+            transition: width 0.2s ease;
+        }
+
+        /* -------------------------------------------------
+           Результаты
+        ------------------------------------------------- */
+
+        .result-section {
+            display: none;
+            margin-top: 25px;
+        }
+
+        .result-section.visible {
+            display: block;
+        }
+
+        .result-box {
+            padding: 16px;
+            border-radius: 12px;
+            background: #f9fafb;
+            border: 1px solid #e5e7eb;
+        }
+
+        .result-title {
+            margin: 0 0 10px;
+            font-size: 18px;
+        }
+
+        .result-success {
+            color: #065f46;
+        }
+
+        .result-error {
+            color: #991b1b;
+        }
+
+        .result-list {
+            margin: 0;
+            padding-left: 20px;
+            color: #374151;
+            line-height: 1.7;
+        }
+
+        /* -------------------------------------------------
+           Подсказка
+        ------------------------------------------------- */
+
+        .hint {
+            margin-top: 24px;
+            padding: 14px 16px;
+            border-radius: 10px;
+            background: #fffbeb;
+            border: 1px solid #fde68a;
+            color: #92400e;
+            font-size: 14px;
+            line-height: 1.5;
+        }
+
+        /* -------------------------------------------------
+           Мобильная версия
+        ------------------------------------------------- */
+
+        @media (max-width: 640px) {
+            .page {
+                padding: 20px 12px;
+            }
+
+            .container {
+                padding: 22px 16px;
+            }
+
+            h1 {
+                font-size: 23px;
+            }
+
+            .drop-zone {
+                min-height: 190px;
+                padding: 20px;
+            }
+
+            .buttons button {
+                width: 100%;
+            }
+
+            .file-item {
+                align-items: flex-start;
+            }
+
+            .file-item .btn-remove {
+                flex: 0 0 auto;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+<div class="page">
+
+    <div class="container">
+
+        <h1>📦 Пакетная загрузка Excel-файлов</h1>
+
+        <p class="description">
+            Выберите один или несколько Excel-файлов с отправлениями.
+            Файлы будут последовательно загружены и обработаны системой.
+        </p>
+
+
+        <!-- ================================================
+             Flash-сообщения Flask
+        ================================================= -->
+
+        <div class="flash-messages">
+
+            {% with messages = get_flashed_messages(with_categories=true) %}
+
+                {% if messages %}
+
+                    {% for category, message in messages %}
+
+                        <div class="flash flash-{{ category }}">
+                            {{ message }}
+                        </div>
+
+                    {% endfor %}
+
+                {% endif %}
+
+            {% endwith %}
+
+        </div>
+
+
+        <!-- ================================================
+             Форма
+        ================================================= -->
+
+        <form
+            id="uploadForm"
+            action="/upload"
+            method="post"
+            enctype="multipart/form-data"
+        >
+
+            <!-- Скрытое поле файлов -->
+            <input
+                id="fileInput"
+                type="file"
+                name="files"
+                accept=".xlsx,.xls"
+                multiple
+            >
+
+
+            <!-- Drag & Drop -->
+
+            <div
+                id="dropZone"
+                class="drop-zone"
+                role="button"
+                tabindex="0"
+            >
+
+                <div class="drop-zone-icon">
+                    📊
+                </div>
+
+                <div class="drop-zone-title">
+                    Перетащите Excel-файлы сюда
+                </div>
+
+                <div class="drop-zone-text">
+                    или нажмите для выбора нескольких файлов
+                    <br>
+                    Поддерживаются файлы .xlsx и .xls
+                </div>
+
+            </div>
+
+
+            <!-- Список выбранных файлов -->
+
+            <div
+                id="filesSection"
+                class="files-section"
+            >
+
+                <div class="files-header">
+
+                    <h2 class="files-title">
+                        Выбранные файлы
+                    </h2>
+
+                    <div
+                        id="fileCounter"
+                        class="file-counter"
+                    >
+                        0 файлов
+                    </div>
+
+                </div>
+
+
+                <div
+                    id="fileList"
+                    class="file-list"
+                >
+                </div>
+
+            </div>
+
+
+            <!-- Кнопки -->
+
+            <div class="buttons">
+
+                <button
+                    id="selectButton"
+                    type="button"
+                    class="btn-select"
+                >
+                    📂 Выбрать файлы
+                </button>
+
+
+                <button
+                    id="uploadButton"
+                    type="submit"
+                    class="btn-upload"
+                    disabled
+                >
+                    🚀 Загрузить и обработать
+                </button>
+
+
+                <button
+                    id="clearButton"
+                    type="button"
+                    class="btn-clear"
+                    disabled
+                >
+                    🗑 Очистить список
+                </button>
+
+            </div>
+
+        </form>
+
+
+        <!-- ================================================
+             Прогресс загрузки
+        ================================================= -->
+
+        <div
+            id="progressSection"
+            class="progress-section"
+        >
+
+            <div class="progress-info">
+
+                <div
+                    id="progressText"
+                    class="progress-text"
+                >
+                    Подготовка к загрузке...
+                </div>
+
+                <div
+                    id="progressPercent"
+                    class="progress-percent"
+                >
+                    0%
+                </div>
+
+            </div>
+
+
+            <div class="progress-bar">
+
+                <div
+                    id="progressValue"
+                    class="progress-value"
+                >
+                </div>
+
+            </div>
+
+        </div>
+
+
+        <!-- ================================================
+             Результат
+        ================================================= -->
+
+        <div
+            id="resultSection"
+            class="result-section"
+        >
+
+            <div
+                id="resultBox"
+                class="result-box"
+            >
+
+                <h2
+                    id="resultTitle"
+                    class="result-title"
+                >
+                </h2>
+
+                <ul
+                    id="resultList"
+                    class="result-list"
+                >
+                </ul>
+
+            </div>
+
+        </div>
+
+
+        <div class="hint">
+
+            <strong>ℹ Важно:</strong>
+            после загрузки файлы передаются на сервер для обработки.
+            Не закрывайте страницу до завершения пакетной загрузки.
+
+        </div>
+
     </div>
 
-    <!-- Форма загрузки -->
-    <form action="/upload" method="post" enctype="multipart/form-data">
-      <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
-        <div class="file-upload-wrapper">
-          <input type="file" name="file" accept=".xlsx,.xls" required>
-          <button type="button" class="btn-file">📂 Выбрать файл</button>
-        </div>
-        <span style="color: #666; font-size: 0.9rem;">Поддерживаются .xlsx и .xls</span>
-        <button type="submit" class="btn-primary">🚀 Загрузить данные</button>
-      </div>
-    </form>
+</div>
 
-    <p style="margin-top: 24px; font-size: 0.85rem; color: #888;">
-      После загрузки вы будете перенаправлены на главную страницу с таблицей.
-    </p>
-  </div>
-</body>
-</html>
+
+<script>
+"use strict";
+
+
+/* ============================================================
+   Получение элементов страницы
+============================================================ */
+
+const uploadForm =
+    document.getElementById("uploadForm");
+
+const fileInput =
+    document.getElementById("fileInput");
+
+const dropZone =
+    document.getElementById("dropZone");
+
+const selectButton =
+    document.getElementById("selectButton");
+
+const uploadButton =
+    document.getElementById("uploadButton");
+
+const clearButton =
+    document.getElementById("clearButton");
+
+const filesSection =
+    document.getElementById("filesSection");
+
+const fileList =
+    document.getElementById("fileList");
+
+const fileCounter =
+    document.getElementById("fileCounter");
+
+const progressSection =
+    document.getElementById("progressSection");
+
+const progressText =
+    document.getElementById("progressText");
+
+const progressPercent =
+    document.getElementById("progressPercent");
+
+const progressValue =
+    document.getElementById("progressValue");
+
+const resultSection =
+    document.getElementById("resultSection");
+
+const resultBox =
+    document.getElementById("resultBox");
+
+const resultTitle =
+    document.getElementById("resultTitle");
+
+const resultList =
+    document.getElementById("resultList");
+
+
+/* ============================================================
+   Список выбранных файлов
+============================================================ */
+
+let selectedFiles = [];
+
+
+/* ============================================================
+   Проверка расширения
+============================================================ */
+
+function isExcelFile(file) {
+
+    const fileName =
+        file.name.toLowerCase();
+
+    return (
+        fileName.endsWith(".xlsx") ||
+        fileName.endsWith(".xls")
+    );
+}
+
+
+/* ============================================================
+   Форматирование размера файла
+============================================================ */
+
+function formatFileSize(bytes) {
+
+    if (bytes === 0) {
+        return "0 Б";
+    }
+
+    const units = [
+        "Б",
+        "КБ",
+        "МБ",
+        "ГБ"
+    ];
+
+    const index =
+        Math.floor(
+            Math.log(bytes) /
+            Math.log(1024)
+        );
+
+    const value =
+        bytes /
+        Math.pow(1024, index);
+
+    return (
+        value.toFixed(
+            index === 0 ? 0 : 2
+        )
+        + " "
+        + units[index]
+    );
+}
+
+
+/* ============================================================
+   Добавление файлов
+============================================================ */
+
+function addFiles(files) {
+
+    const newFiles =
+        Array.from(files);
+
+    let skippedFiles = 0;
+
+
+    for (const file of newFiles) {
+
+        if (!isExcelFile(file)) {
+
+            skippedFiles++;
+
+            continue;
+        }
+
+
+        /*
+         * Проверяем дубликаты.
+         * Сравнение выполняется по имени,
+         * размеру и времени изменения.
+         */
+
+        const alreadyExists =
+            selectedFiles.some(
+                existingFile =>
+
+                    existingFile.name ===
+                        file.name
+
+                    &&
+
+                    existingFile.size ===
+                        file.size
+
+                    &&
+
+                    existingFile.lastModified ===
+                        file.lastModified
+            );
+
+
+        if (!alreadyExists) {
+
+            selectedFiles.push(file);
+
+        }
+
+    }
+
+
+    if (skippedFiles > 0) {
+
+        showResult(
+            "Некоторые файлы пропущены",
+            [
+                "Разрешены только файлы .xlsx и .xls."
+            ],
+            false
+        );
+
+    }
+
+
+    updateFileList();
+
+}
+
+
+/* ============================================================
+   Удаление файла
+============================================================ */
+
+function removeFile(index) {
+
+    selectedFiles.splice(index, 1);
+
+    updateFileList();
+
+}
+
+
+/* ============================================================
+   Очистка списка
+============================================================ */
+
+function clearFiles() {
+
+    selectedFiles = [];
+
+    fileInput.value = "";
+
+    updateFileList();
+
+    hideProgress();
