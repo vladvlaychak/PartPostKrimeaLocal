@@ -900,7 +900,241 @@ def main():
 # ============================================================
 # ENTRY POINT
 # ============================================================
+# ============================================================
+# API ДЛЯ MAIN.JS
+# ============================================================
 
+@app.route("/api/shipment", methods=["GET"])
+def api_shipment():
+    """
+    Поиск отправления по ШПИ.
+    Пример:
+        /api/shipment?shpi=123456789
+    """
+
+    shpi = request.args.get("shpi", "").strip()
+
+    if not shpi:
+        return jsonify({
+            "success": False,
+            "error": "Не указан ШПИ",
+            "shipment": None,
+        }), 400
+
+    conn = get_db_connection()
+
+    try:
+        cur = conn.cursor()
+
+        cur.execute(
+            """
+            SELECT *
+            FROM shipments
+            WHERE shpi = ?
+            LIMIT 1
+            """,
+            (shpi,),
+        )
+
+        row = cur.fetchone()
+
+        if row is None:
+            return jsonify({
+                "success": True,
+                "found": False,
+                "shipment": None,
+            })
+
+        return jsonify({
+            "success": True,
+            "found": True,
+            "shipment": dict(row),
+        })
+
+    finally:
+        conn.close()
+
+
+@app.route("/api/internal-number", methods=["GET"])
+def api_internal_number():
+    """
+    Поиск отправления по внутреннему номеру.
+    Пример:
+        /api/internal-number?number=12345
+    """
+
+    number = request.args.get(
+        "number",
+        "",
+    ).strip()
+
+    if not number:
+        return jsonify({
+            "success": False,
+            "error": "Не указан внутренний номер",
+            "shipment": None,
+        }), 400
+
+    conn = get_db_connection()
+
+    try:
+        cur = conn.cursor()
+
+        # В разных версиях БД поле может называться
+        # internal_number или number.
+        #
+        # Сначала пробуем internal_number.
+
+        try:
+
+            cur.execute(
+                """
+                SELECT *
+                FROM shipments
+                WHERE internal_number = ?
+                LIMIT 1
+                """,
+                (number,),
+            )
+
+            row = cur.fetchone()
+
+        except Exception:
+
+            # Совместимость со старой схемой БД
+
+            cur.execute(
+                """
+                SELECT *
+                FROM shipments
+                WHERE number = ?
+                LIMIT 1
+                """,
+                (number,),
+            )
+
+            row = cur.fetchone()
+
+        if row is None:
+            return jsonify({
+                "success": True,
+                "found": False,
+                "shipment": None,
+            })
+
+        return jsonify({
+            "success": True,
+            "found": True,
+            "shipment": dict(row),
+        })
+
+    finally:
+        conn.close()
+
+
+@app.route("/api/stats", methods=["GET"])
+def api_stats():
+    """
+    Статистика отправлений.
+    """
+
+    conn = get_db_connection()
+
+    try:
+        cur = conn.cursor()
+
+        # Общее количество
+
+        cur.execute(
+            """
+            SELECT COUNT(*) AS total
+            FROM shipments
+            """
+        )
+
+        total_row = cur.fetchone()
+
+        total = (
+            int(total_row["total"])
+            if total_row
+            else 0
+        )
+
+        # Количество с ШПИ
+
+        try:
+
+            cur.execute(
+                """
+                SELECT COUNT(*) AS count
+                FROM shipments
+                WHERE shpi IS NOT NULL
+                  AND TRIM(shpi) != ''
+                """
+            )
+
+            shpi_row = cur.fetchone()
+
+            with_shpi = (
+                int(shpi_row["count"])
+                if shpi_row
+                else 0
+            )
+
+        except Exception:
+
+            with_shpi = 0
+
+        # Последняя загрузка
+
+        last_uploaded = None
+
+        try:
+
+            cur.execute(
+                """
+                SELECT uploaded_at
+                FROM shipments
+                ORDER BY uploaded_at DESC
+                LIMIT 1
+                """
+            )
+
+            last_row = cur.fetchone()
+
+            if last_row:
+
+                last_uploaded = (
+                    last_row["uploaded_at"]
+                )
+
+        except Exception:
+
+            pass
+
+        return jsonify({
+
+            "success": True,
+
+            "total": total,
+
+            "with_shpi": with_shpi,
+
+            "without_shpi": (
+                max(
+                    0,
+                    total - with_shpi,
+                )
+            ),
+
+            "last_uploaded": (
+                last_uploaded
+            ),
+
+        })
+
+    finally:
+        conn.close()
 if __name__ == "__main__":
 
     main()
