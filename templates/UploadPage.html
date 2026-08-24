@@ -909,3 +909,647 @@ function clearFiles() {
     updateFileList();
 
     hideProgress();
+
+}
+
+
+/* ============================================================
+   Обновление списка файлов
+============================================================ */
+
+function updateFileList() {
+
+    fileList.innerHTML = "";
+
+
+    const count =
+        selectedFiles.length;
+
+
+    if (count === 0) {
+
+        filesSection.classList.remove(
+            "visible"
+        );
+
+        uploadButton.disabled = true;
+
+        clearButton.disabled = true;
+
+        fileCounter.textContent =
+            "0 файлов";
+
+        return;
+
+    }
+
+
+    filesSection.classList.add(
+        "visible"
+    );
+
+
+    uploadButton.disabled = false;
+
+    clearButton.disabled = false;
+
+
+    fileCounter.textContent =
+        count === 1
+            ? "1 файл"
+            : `${count} файлов`;
+
+
+    selectedFiles.forEach(
+        (file, index) => {
+
+            const item =
+                document.createElement("div");
+
+            item.className =
+                "file-item";
+
+
+            const icon =
+                document.createElement("div");
+
+            icon.className =
+                "file-item-icon";
+
+            icon.textContent =
+                "📄";
+
+
+            const info =
+                document.createElement("div");
+
+            info.className =
+                "file-info";
+
+
+            const name =
+                document.createElement("div");
+
+            name.className =
+                "file-name";
+
+            name.textContent =
+                file.name;
+
+
+            const size =
+                document.createElement("div");
+
+            size.className =
+                "file-size";
+
+            size.textContent =
+                formatFileSize(file.size);
+
+
+            info.appendChild(name);
+
+            info.appendChild(size);
+
+
+            const removeButton =
+                document.createElement("button");
+
+            removeButton.type =
+                "button";
+
+            removeButton.className =
+                "btn-remove";
+
+            removeButton.textContent =
+                "Удалить";
+
+
+            removeButton.addEventListener(
+                "click",
+                () => {
+                    removeFile(index);
+                }
+            );
+
+
+            item.appendChild(icon);
+
+            item.appendChild(info);
+
+            item.appendChild(removeButton);
+
+
+            fileList.appendChild(item);
+
+        }
+    );
+
+}
+
+
+/* ============================================================
+   Синхронизация массива с input type=file
+============================================================ */
+
+function syncFilesToInput() {
+
+    const dataTransfer =
+        new DataTransfer();
+
+
+    selectedFiles.forEach(
+        file => {
+            dataTransfer.items.add(file);
+        }
+    );
+
+
+    fileInput.files =
+        dataTransfer.files;
+
+}
+
+
+/* ============================================================
+   Drag & Drop
+============================================================ */
+
+[
+    "dragenter",
+    "dragover"
+].forEach(
+    eventName => {
+
+        dropZone.addEventListener(
+            eventName,
+            event => {
+
+                event.preventDefault();
+
+                event.stopPropagation();
+
+                dropZone.classList.add(
+                    "dragover"
+                );
+
+            }
+        );
+
+    }
+);
+
+
+[
+    "dragleave",
+    "drop"
+].forEach(
+    eventName => {
+
+        dropZone.addEventListener(
+            eventName,
+            event => {
+
+                event.preventDefault();
+
+                event.stopPropagation();
+
+                dropZone.classList.remove(
+                    "dragover"
+                );
+
+            }
+        );
+
+    }
+);
+
+
+dropZone.addEventListener(
+    "drop",
+    event => {
+
+        const files =
+            event.dataTransfer.files;
+
+        addFiles(files);
+
+    }
+);
+
+
+/* ============================================================
+   Выбор файлов
+============================================================ */
+
+selectButton.addEventListener(
+    "click",
+    () => {
+
+        fileInput.click();
+
+    }
+);
+
+
+dropZone.addEventListener(
+    "click",
+    () => {
+
+        fileInput.click();
+
+    }
+);
+
+
+dropZone.addEventListener(
+    "keydown",
+    event => {
+
+        if (
+            event.key === "Enter" ||
+            event.key === " "
+        ) {
+
+            event.preventDefault();
+
+            fileInput.click();
+
+        }
+
+    }
+);
+
+
+fileInput.addEventListener(
+    "change",
+    event => {
+
+        addFiles(
+            event.target.files
+        );
+
+        /*
+         * Очищаем input.
+         * Это позволяет повторно выбрать
+         * тот же файл после удаления.
+         */
+
+        fileInput.value = "";
+
+    }
+);
+
+
+/* ============================================================
+   Очистка списка
+============================================================ */
+
+clearButton.addEventListener(
+    "click",
+    clearFiles
+);
+
+
+/* ============================================================
+   Прогресс
+============================================================ */
+
+function showProgress() {
+
+    progressSection.classList.add(
+        "visible"
+    );
+
+    setProgress(
+        0,
+        "Подготовка файлов..."
+    );
+
+}
+
+
+function hideProgress() {
+
+    progressSection.classList.remove(
+        "visible"
+    );
+
+}
+
+
+function setProgress(
+    percent,
+    text
+) {
+
+    const safePercent =
+        Math.max(
+            0,
+            Math.min(
+                100,
+                percent
+            )
+        );
+
+
+    progressValue.style.width =
+        `${safePercent}%`;
+
+
+    progressPercent.textContent =
+        `${Math.round(safePercent)}%`;
+
+
+    progressText.textContent =
+        text;
+
+}
+
+
+/* ============================================================
+   Результаты
+============================================================ */
+
+function showResult(
+    title,
+    messages,
+    success
+) {
+
+    resultSection.classList.add(
+        "visible"
+    );
+
+
+    resultTitle.textContent =
+        title;
+
+
+    resultTitle.className =
+        success
+            ? "result-title result-success"
+            : "result-title result-error";
+
+
+    resultBox.innerHTML =
+        "";
+
+
+    resultBox.appendChild(
+        resultTitle
+    );
+
+
+    const list =
+        document.createElement("ul");
+
+    list.className =
+        "result-list";
+
+
+    messages.forEach(
+        message => {
+
+            const item =
+                document.createElement("li");
+
+            item.textContent =
+                message;
+
+            list.appendChild(item);
+
+        }
+    );
+
+
+    resultBox.appendChild(list);
+
+}
+
+
+/* ============================================================
+   Пакетная загрузка
+============================================================ */
+
+uploadForm.addEventListener(
+    "submit",
+    async event => {
+
+        event.preventDefault();
+
+
+        if (
+            selectedFiles.length === 0
+        ) {
+
+            showResult(
+                "Файлы не выбраны",
+                [
+                    "Выберите хотя бы один Excel-файл."
+                ],
+                false
+            );
+
+            return;
+
+        }
+
+
+        /*
+         * Блокируем кнопки,
+         * чтобы пользователь не запустил
+         * вторую параллельную загрузку.
+         */
+
+        uploadButton.disabled = true;
+
+        clearButton.disabled = true;
+
+        selectButton.disabled = true;
+
+
+        resultSection.classList.remove(
+            "visible"
+        );
+
+
+        showProgress();
+
+
+        const results = [];
+
+        let successCount = 0;
+
+        let errorCount = 0;
+
+
+        /*
+         * Последовательная загрузка файлов.
+         *
+         * Это специально сделано по одному файлу,
+         * чтобы не создавать параллельную нагрузку
+         * и избежать конфликтов watchdog/Excel/SQLite.
+         */
+
+        for (
+            let index = 0;
+            index < selectedFiles.length;
+            index++
+        ) {
+
+            const file =
+                selectedFiles[index];
+
+
+            const startPercent =
+                (
+                    index /
+                    selectedFiles.length
+                )
+                * 100;
+
+
+            setProgress(
+                startPercent,
+                `Загрузка ${index + 1} из ${selectedFiles.length}: ${file.name}`
+            );
+
+
+            try {
+
+                const formData =
+                    new FormData();
+
+                /*
+                 * Важно:
+                 * используется имя "file",
+                 * чтобы сохранить совместимость
+                 * с существующим Flask route /upload.
+                 */
+
+                formData.append(
+                    "file",
+                    file
+                );
+
+
+                const response =
+                    await fetch(
+                        uploadForm.action,
+                        {
+                            method: "POST",
+                            body: formData,
+                            credentials: "same-origin"
+                        }
+                    );
+
+
+                if (!response.ok) {
+
+                    throw new Error(
+                        `Ошибка сервера: ${response.status}`
+                    );
+
+                }
+
+
+                successCount++;
+
+
+                results.push(
+                    `✓ ${file.name} — успешно загружен`
+                );
+
+            } catch (error) {
+
+                errorCount++;
+
+
+                results.push(
+                    `✗ ${file.name} — ${error.message}`
+                );
+
+            }
+
+
+            const endPercent =
+                (
+                    (
+                        index + 1
+                    )
+                    /
+                    selectedFiles.length
+                )
+                * 100;
+
+
+            setProgress(
+                endPercent,
+                `Обработано файлов: ${index + 1} из ${selectedFiles.length}`
+            );
+
+        }
+
+
+        if (errorCount === 0) {
+
+            showResult(
+                "✓ Пакетная загрузка завершена",
+                [
+                    `Успешно обработано файлов: ${successCount}.`,
+                    ...results
+                ],
+                true
+            );
+
+        } else if (successCount === 0) {
+
+            showResult(
+                "✗ Не удалось загрузить файлы",
+                results,
+                false
+            );
+
+        } else {
+
+            showResult(
+                "⚠ Пакетная загрузка завершена с ошибками",
+                [
+                    `Успешно: ${successCount}.`,
+                    `Ошибок: ${errorCount}.`,
+                    ...results
+                ],
+                false
+            );
+
+        }
+
+
+        uploadButton.disabled = false;
+
+        clearButton.disabled = false;
+
+        selectButton.disabled = false;
+
+
+        /*
+         * Если всё успешно, очищаем список.
+         */
+
+        if (errorCount === 0) {
+
+            selectedFiles = [];
+
+            updateFileList();
+
+        }
+
+    }
+);
+
+
+</script>
+
+</body>
+</html>
