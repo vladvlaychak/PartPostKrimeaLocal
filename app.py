@@ -32,6 +32,10 @@ from upload_status import (
 )
 
 
+# ============================================================
+# FLASK
+# ============================================================
+
 app = Flask(__name__)
 
 app.secret_key = (
@@ -39,10 +43,24 @@ app.secret_key = (
 )
 
 
+# ============================================================
+# UPLOAD FOLDER
+# ============================================================
+
 UPLOAD_PATH = Path(
     UPLOAD_FOLDER
 ).resolve()
 
+
+UPLOAD_PATH.mkdir(
+    parents=True,
+    exist_ok=True,
+)
+
+
+# ============================================================
+# ОСНОВНАЯ СТРАНИЦА
+# ============================================================
 
 @app.route("/")
 def index():
@@ -295,6 +313,10 @@ def index():
     )
 
 
+# ============================================================
+# СТРАНИЦА ЗАГРУЗКИ
+# ============================================================
+
 @app.route("/upload-page")
 def upload_page():
 
@@ -302,6 +324,10 @@ def upload_page():
         "UploadPage.html"
     )
 
+
+# ============================================================
+# ЗАГРУЗКА ОДНОГО ИЛИ НЕСКОЛЬКИХ ФАЙЛОВ
+# ============================================================
 
 @app.route(
     "/upload",
@@ -314,31 +340,64 @@ def upload_file():
         exist_ok=True,
     )
 
+    # --------------------------------------------------------
+    # Основной вариант:
+    #
+    # FormData:
+    #
+    # files = file1
+    # files = file2
+    # files = file3
+    # --------------------------------------------------------
+
     files = request.files.getlist(
         "files"
     )
 
+    # --------------------------------------------------------
+    # Поддержка старой формы:
+    #
+    # file = file
+    # --------------------------------------------------------
+
     if not files:
 
-        single_file = request.files.get(
-            "file"
+        single_file = (
+            request.files.get(
+                "file"
+            )
         )
 
         if single_file:
-            files = [single_file]
+
+            files = [
+                single_file
+            ]
+
+    # --------------------------------------------------------
+    # Ничего не передали
+    # --------------------------------------------------------
 
     if not files:
 
         return jsonify({
             "success": False,
-            "error": "Файлы не выбраны",
+            "error": (
+                "Файлы не выбраны"
+            ),
+            "jobs": [],
         }), 400
 
     jobs = []
 
+    # ========================================================
+    # ОБРАБАТЫВАЕМ КАЖДЫЙ ФАЙЛ
+    # ========================================================
+
     for uploaded_file in files:
 
         if not uploaded_file:
+
             continue
 
         original_name = (
@@ -347,13 +406,30 @@ def upload_file():
         ).strip()
 
         if not original_name:
+
             continue
 
+        # ----------------------------------------------------
+        # Безопасное имя
+        # ----------------------------------------------------
+
+        original_path = Path(
+            original_name
+        )
+
+        clean_name = (
+            original_path.name
+        )
+
         extension = (
-            Path(original_name)
+            original_path
             .suffix
             .lower()
         )
+
+        # ----------------------------------------------------
+        # Проверка расширения
+        # ----------------------------------------------------
 
         if extension not in {
             ".xlsx",
@@ -361,107 +437,289 @@ def upload_file():
         }:
 
             jobs.append({
+
                 "success": False,
-                "filename": original_name,
-                "error": (
-                    "Поддерживаются "
-                    "только .xlsx и .xls"
+
+                "filename": clean_name,
+
+                "status": "error",
+
+                "message": (
+                    "Неподдерживаемый "
+                    "формат. Разрешены "
+                    ".xlsx и .xls"
                 ),
+
             })
 
             continue
 
+        # ----------------------------------------------------
+        # Создаём уникальный ID
+        # ----------------------------------------------------
+
         job_id = uuid.uuid4().hex
 
-        safe_name = (
-            f"{job_id}_{Path(original_name).name}"
+        # ----------------------------------------------------
+        # Имя файла внутри uploads
+        #
+        # Например:
+        #
+        # 5f8c..._file.xlsx
+        # ----------------------------------------------------
+
+        stored_name = (
+            f"{job_id}_{clean_name}"
         )
 
         destination = (
             UPLOAD_PATH
-            / safe_name
+            / stored_name
         )
 
         try:
+
+            # ------------------------------------------------
+            # Сохраняем файл
+            # ------------------------------------------------
 
             uploaded_file.save(
                 str(destination)
             )
 
+            # ------------------------------------------------
+            # Проверяем, что файл реально существует
+            # ------------------------------------------------
+
+            if not destination.exists():
+
+                raise OSError(
+                    "Файл не был создан "
+                    "в папке uploads"
+                )
+
+            # ------------------------------------------------
+            # Проверяем размер
+            # ------------------------------------------------
+
+            file_size = (
+                destination.stat()
+                .st_size
+            )
+
+            if file_size <= 0:
+
+                raise OSError(
+                    "Загруженный файл "
+                    "имеет размер 0 байт"
+                )
+
+            # ------------------------------------------------
+            # Создаём job
+            # ------------------------------------------------
+
             create_job(
                 job_id=job_id,
-                filename=original_name,
+                filename=clean_name,
                 file_path=str(
                     destination
                 ),
             )
 
             jobs.append({
+
                 "success": True,
+
                 "job_id": job_id,
-                "filename": original_name,
+
+                "filename": clean_name,
+
                 "status": "uploaded",
+
                 "message": (
                     "Файл загружен "
                     "и ожидает обработки"
                 ),
+
+                "size": file_size,
+
             })
 
             print(
-                "[UPLOAD] Загружен файл: "
-                f"{original_name} "
-                f"→ {destination}"
+                "[UPLOAD] "
+                f"✓ {clean_name}"
+            )
+
+            print(
+                "[UPLOAD] Job ID: "
+                f"{job_id}"
+            )
+
+            print(
+                "[UPLOAD] Path: "
+                f"{destination}"
+            )
+
+            print(
+                "[UPLOAD] Size: "
+                f"{file_size} bytes"
             )
 
         except Exception as error:
 
+            print(
+                "[UPLOAD] "
+                f"✗ Ошибка {clean_name}: "
+                f"{error}"
+            )
+
+            # ------------------------------------------------
+            # Если файл частично создался —
+            # удаляем его
+            # ------------------------------------------------
+
+            try:
+
+                if destination.exists():
+
+                    destination.unlink()
+
+            except Exception:
+
+                pass
+
             jobs.append({
+
                 "success": False,
-                "filename": original_name,
-                "error": str(error),
+
+                "filename": clean_name,
+
+                "status": "error",
+
+                "message": (
+                    f"{type(error).__name__}: "
+                    f"{error}"
+                ),
+
             })
 
-    successful = [
+    # ========================================================
+    # РЕЗУЛЬТАТ
+    # ========================================================
+
+    successful_jobs = [
         job
         for job in jobs
-        if job.get("success")
+        if job.get(
+            "success"
+        )
     ]
 
-    if not successful:
+    failed_jobs = [
+        job
+        for job in jobs
+        if not job.get(
+            "success"
+        )
+    ]
+
+    # --------------------------------------------------------
+    # Ни одного успешного файла
+    # --------------------------------------------------------
+
+    if not successful_jobs:
 
         return jsonify({
+
             "success": False,
+
             "jobs": jobs,
+
+            "total": len(jobs),
+
+            "uploaded": 0,
+
+            "errors": len(
+                failed_jobs
+            ),
+
+            "message": (
+                "Ни один файл "
+                "не был загружен"
+            ),
+
         }), 400
 
+    # --------------------------------------------------------
+    # Есть успешные файлы
+    # --------------------------------------------------------
+
     return jsonify({
+
         "success": True,
+
         "jobs": jobs,
+
+        "total": len(jobs),
+
+        "uploaded": len(
+            successful_jobs
+        ),
+
+        "errors": len(
+            failed_jobs
+        ),
+
+        "message": (
+            f"Загружено файлов: "
+            f"{len(successful_jobs)}"
+        ),
+
     })
 
 
+# ============================================================
+# СТАТУС ОДНОГО ФАЙЛА
+# ============================================================
+
 @app.route(
     "/upload/status/<job_id>",
+    methods=["GET"],
 )
 def upload_status(job_id):
 
-    job = get_job(job_id)
+    job = get_job(
+        job_id
+    )
 
     if job is None:
 
         return jsonify({
+
             "success": False,
-            "error": "Задание не найдено",
+
+            "error": (
+                "Задание не найдено"
+            ),
+
         }), 404
 
     return jsonify({
+
         "success": True,
+
         "job": job,
+
     })
 
 
+# ============================================================
+# СТАТУС НЕСКОЛЬКИХ ФАЙЛОВ
+# ============================================================
+
 @app.route(
     "/upload/status",
+    methods=["GET"],
 )
 def upload_status_batch():
 
@@ -472,35 +730,139 @@ def upload_status_batch():
     if not job_ids:
 
         return jsonify({
+
             "success": False,
-            "error": "Не переданы job_id",
+
+            "error": (
+                "Не переданы job_id"
+            ),
+
+            "jobs": [],
+
         }), 400
 
+    jobs = get_jobs(
+        job_ids
+    )
+
     return jsonify({
+
         "success": True,
-        "jobs": get_jobs(
-            job_ids
-        ),
+
+        "jobs": jobs,
+
     })
 
 
-if __name__ == "__main__":
+# ============================================================
+# HEALTH CHECK
+# ============================================================
+
+@app.route(
+    "/health",
+    methods=["GET"],
+)
+def health():
+
+    return jsonify({
+
+        "success": True,
+
+        "status": "ok",
+
+        "upload_folder": str(
+            UPLOAD_PATH
+        ),
+
+        "upload_folder_exists":
+            UPLOAD_PATH.exists(),
+
+    })
+
+
+# ============================================================
+# ЗАПУСК
+# ============================================================
+
+def main():
+
+    print()
+    print(
+        "=========================================="
+    )
+
+    print(
+        " PartPostKrimeaLocal"
+    )
+
+    print(
+        "=========================================="
+    )
+
+    print(
+        "[INIT] Upload folder:"
+    )
+
+    print(
+        f"       {UPLOAD_PATH}"
+    )
+
+    # --------------------------------------------------------
+    # Создаём uploads
+    # --------------------------------------------------------
 
     UPLOAD_PATH.mkdir(
         parents=True,
         exist_ok=True,
     )
 
+    # --------------------------------------------------------
+    # Инициализируем БД
+    # --------------------------------------------------------
+
     print(
-        "[INIT] Папка uploads: "
-        f"{UPLOAD_PATH}"
+        "[INIT] Инициализация БД..."
     )
 
     init_db()
 
+    print(
+        "[INIT] БД готова"
+    )
+
+    # --------------------------------------------------------
+    # Запускаем watchdog
+    # --------------------------------------------------------
+
+    print(
+        "[INIT] Запуск watchdog..."
+    )
+
     observer = start_watchdog(
         UPLOAD_PATH
     )
+
+    print(
+        "[INIT] Watchdog запущен"
+    )
+
+    # --------------------------------------------------------
+    # Запускаем Flask / Waitress
+    # --------------------------------------------------------
+
+    print(
+        "[SERVER] Запуск сервера..."
+    )
+
+    print(
+        "[SERVER] http://127.0.0.1:5000"
+    )
+
+    print(
+        "[SERVER] http://localhost:5000"
+    )
+
+    print()
 
     try:
 
@@ -517,6 +879,28 @@ if __name__ == "__main__":
             "[SERVER] Остановка..."
         )
 
-        observer.stop()
+    finally:
 
-    observer.join()
+        try:
+
+            observer.stop()
+
+            observer.join(
+                timeout=5
+            )
+
+        except Exception as error:
+
+            print(
+                "[SERVER] Ошибка остановки "
+                f"watchdog: {error}"
+            )
+
+
+# ============================================================
+# ENTRY POINT
+# ============================================================
+
+if __name__ == "__main__":
+
+    main()
