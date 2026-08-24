@@ -1,29 +1,20 @@
 <!DOCTYPE html>
 <html lang="ru">
+
 <head>
+
     <meta charset="UTF-8">
+
     <meta
         name="viewport"
         content="width=device-width, initial-scale=1.0"
     >
 
-    <title>Пакетная загрузка Excel — PartPostCrimea</title>
+    <title>
+        Пакетная загрузка Excel
+    </title>
 
     <style>
-        :root {
-            --primary: #2563eb;
-            --primary-hover: #1d4ed8;
-            --success: #059669;
-            --success-hover: #047857;
-            --danger: #dc2626;
-            --danger-hover: #b91c1c;
-            --warning: #d97706;
-            --text: #1f2937;
-            --muted: #6b7280;
-            --border: #d1d5db;
-            --background: #f3f4f6;
-            --card: #ffffff;
-        }
 
         * {
             box-sizing: border-box;
@@ -31,1049 +22,466 @@
 
         body {
             margin: 0;
-            min-height: 100vh;
+            padding: 20px;
             font-family:
-                system-ui,
-                -apple-system,
-                BlinkMacSystemFont,
-                "Segoe UI",
                 Arial,
                 sans-serif;
-            background: var(--background);
-            color: var(--text);
-        }
-
-        .page {
-            width: 100%;
-            max-width: 1000px;
-            margin: 0 auto;
-            padding: 40px 20px;
+            background: #f3f4f6;
+            color: #1f2937;
         }
 
         .container {
-            background: var(--card);
-            border-radius: 16px;
-            padding: 32px;
-            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.08);
+            max-width: 900px;
+            margin: 0 auto;
+            background: white;
+            padding: 30px;
+            border-radius: 14px;
+            box-shadow:
+                0 5px 25px
+                rgba(0, 0, 0, 0.08);
         }
 
         h1 {
-            margin: 0 0 12px;
-            font-size: 28px;
-            color: #111827;
+            margin-top: 0;
         }
-
-        .description {
-            margin: 0 0 28px;
-            color: var(--muted);
-            line-height: 1.6;
-        }
-
-        /* -------------------------------------------------
-           Flash-сообщения
-        ------------------------------------------------- */
-
-        .flash-messages {
-            margin-bottom: 20px;
-        }
-
-        .flash {
-            padding: 14px 16px;
-            margin-bottom: 10px;
-            border-radius: 10px;
-            font-size: 14px;
-        }
-
-        .flash-success {
-            color: #065f46;
-            background: #d1fae5;
-            border: 1px solid #a7f3d0;
-        }
-
-        .flash-error {
-            color: #991b1b;
-            background: #fee2e2;
-            border: 1px solid #fecaca;
-        }
-
-        .flash-warning {
-            color: #92400e;
-            background: #fef3c7;
-            border: 1px solid #fde68a;
-        }
-
-        /* -------------------------------------------------
-           Зона Drag & Drop
-        ------------------------------------------------- */
 
         .drop-zone {
-            position: relative;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            min-height: 220px;
-            padding: 30px;
-            border: 2px dashed var(--primary);
-            border-radius: 14px;
-            background: #f8fbff;
-            cursor: pointer;
-            transition:
-                border-color 0.2s ease,
-                background 0.2s ease,
-                transform 0.2s ease;
-        }
-
-        .drop-zone:hover {
+            padding: 50px 20px;
+            text-align: center;
+            border: 2px dashed #2563eb;
+            border-radius: 12px;
             background: #eff6ff;
-            border-color: var(--primary-hover);
+            cursor: pointer;
         }
 
         .drop-zone.dragover {
             background: #dbeafe;
-            border-color: var(--primary-hover);
-            transform: scale(1.01);
         }
 
-        .drop-zone-icon {
-            font-size: 52px;
-            margin-bottom: 12px;
+        .drop-icon {
+            font-size: 50px;
         }
 
-        .drop-zone-title {
-            font-size: 19px;
-            font-weight: 700;
-            text-align: center;
-            color: #1e3a8a;
+        .drop-title {
+            margin-top: 10px;
+            font-size: 20px;
+            font-weight: bold;
         }
 
-        .drop-zone-text {
+        .drop-description {
             margin-top: 8px;
-            text-align: center;
-            color: var(--muted);
-            font-size: 14px;
+            color: #6b7280;
         }
 
         #fileInput {
             display: none;
         }
 
-        /* -------------------------------------------------
-           Кнопки
-        ------------------------------------------------- */
-
         .buttons {
             display: flex;
-            gap: 12px;
-            flex-wrap: wrap;
+            gap: 10px;
             margin-top: 20px;
+            flex-wrap: wrap;
         }
 
         button {
-            appearance: none;
-            border: none;
-            border-radius: 9px;
             padding: 12px 20px;
+            border: 0;
+            border-radius: 8px;
+            cursor: pointer;
             font-size: 15px;
             font-weight: 600;
-            cursor: pointer;
-            transition:
-                opacity 0.2s ease,
-                transform 0.1s ease,
-                background 0.2s ease;
-        }
-
-        button:hover:not(:disabled) {
-            transform: translateY(-1px);
         }
 
         button:disabled {
+            opacity: 0.5;
             cursor: not-allowed;
-            opacity: 0.55;
         }
 
         .btn-select {
-            background: var(--primary);
+            background: #2563eb;
             color: white;
-        }
-
-        .btn-select:hover:not(:disabled) {
-            background: var(--primary-hover);
         }
 
         .btn-upload {
-            background: var(--success);
+            background: #059669;
             color: white;
-        }
-
-        .btn-upload:hover:not(:disabled) {
-            background: var(--success-hover);
         }
 
         .btn-clear {
             background: #e5e7eb;
-            color: #374151;
         }
 
-        .btn-clear:hover:not(:disabled) {
-            background: #d1d5db;
+        .files {
+            margin-top: 25px;
         }
 
-        .btn-remove {
-            padding: 7px 10px;
-            background: #fee2e2;
-            color: var(--danger);
-            font-size: 13px;
-        }
-
-        .btn-remove:hover {
-            background: #fecaca;
-        }
-
-        /* -------------------------------------------------
-           Список файлов
-        ------------------------------------------------- */
-
-        .files-section {
-            display: none;
-            margin-top: 28px;
-        }
-
-        .files-section.visible {
-            display: block;
-        }
-
-        .files-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            gap: 16px;
-            margin-bottom: 12px;
-            flex-wrap: wrap;
-        }
-
-        .files-title {
-            margin: 0;
-            font-size: 20px;
-        }
-
-        .file-counter {
-            padding: 6px 12px;
-            border-radius: 20px;
-            background: #dbeafe;
-            color: #1d4ed8;
-            font-size: 13px;
-            font-weight: 700;
-        }
-
-        .file-list {
-            border: 1px solid var(--border);
-            border-radius: 12px;
-            overflow: hidden;
-            max-height: 420px;
-            overflow-y: auto;
-        }
-
-        .file-item {
+        .file {
             display: flex;
             align-items: center;
             gap: 12px;
-            padding: 14px 16px;
-            border-bottom: 1px solid #e5e7eb;
+            padding: 15px;
+            margin-bottom: 8px;
+            border: 1px solid #e5e7eb;
+            border-radius: 9px;
             background: white;
         }
 
-        .file-item:last-child {
-            border-bottom: none;
-        }
-
-        .file-item-icon {
-            flex: 0 0 auto;
-            font-size: 24px;
-        }
-
         .file-info {
-            min-width: 0;
             flex: 1;
+            min-width: 0;
         }
 
         .file-name {
+            font-weight: bold;
             overflow: hidden;
             text-overflow: ellipsis;
             white-space: nowrap;
-            font-weight: 600;
         }
 
         .file-size {
             margin-top: 4px;
-            color: var(--muted);
+            color: #6b7280;
             font-size: 13px;
         }
 
-        /* -------------------------------------------------
-           Прогресс
-        ------------------------------------------------- */
+        .status {
+            min-width: 150px;
+            text-align: right;
+            font-weight: bold;
+        }
 
-        .progress-section {
-            display: none;
+        .status-uploaded {
+            color: #2563eb;
+        }
+
+        .status-waiting {
+            color: #d97706;
+        }
+
+        .status-processing {
+            color: #7c3aed;
+        }
+
+        .status-completed {
+            color: #059669;
+        }
+
+        .status-error {
+            color: #dc2626;
+        }
+
+        .progress-wrapper {
             margin-top: 25px;
+            display: none;
         }
 
-        .progress-section.visible {
+        .progress-wrapper.visible {
             display: block;
-        }
-
-        .progress-info {
-            display: flex;
-            justify-content: space-between;
-            gap: 15px;
-            margin-bottom: 8px;
-            font-size: 14px;
-        }
-
-        .progress-text {
-            color: #374151;
-            font-weight: 600;
-        }
-
-        .progress-percent {
-            color: var(--primary);
-            font-weight: 700;
         }
 
         .progress-bar {
-            width: 100%;
             height: 12px;
-            overflow: hidden;
-            border-radius: 10px;
             background: #e5e7eb;
+            border-radius: 10px;
+            overflow: hidden;
         }
 
-        .progress-value {
+        .progress {
             width: 0;
             height: 100%;
-            border-radius: inherit;
-            background: var(--primary);
-            transition: width 0.2s ease;
+            background: #2563eb;
+            transition: width 0.3s;
         }
 
-        /* -------------------------------------------------
-           Результаты
-        ------------------------------------------------- */
+        .progress-text {
+            margin-bottom: 8px;
+            font-weight: bold;
+        }
 
-        .result-section {
-            display: none;
+        .result {
             margin-top: 25px;
+            padding: 18px;
+            border-radius: 10px;
+            display: none;
         }
 
-        .result-section.visible {
+        .result.success {
             display: block;
-        }
-
-        .result-box {
-            padding: 16px;
-            border-radius: 12px;
-            background: #f9fafb;
-            border: 1px solid #e5e7eb;
-        }
-
-        .result-title {
-            margin: 0 0 10px;
-            font-size: 18px;
-        }
-
-        .result-success {
+            background: #d1fae5;
             color: #065f46;
         }
 
-        .result-error {
+        .result.error {
+            display: block;
+            background: #fee2e2;
             color: #991b1b;
         }
 
-        .result-list {
-            margin: 0;
-            padding-left: 20px;
-            color: #374151;
-            line-height: 1.7;
+        .remove {
+            background: #fee2e2;
+            color: #991b1b;
+            padding: 7px 10px;
         }
 
-        /* -------------------------------------------------
-           Подсказка
-        ------------------------------------------------- */
-
-        .hint {
-            margin-top: 24px;
-            padding: 14px 16px;
-            border-radius: 10px;
-            background: #fffbeb;
-            border: 1px solid #fde68a;
-            color: #92400e;
-            font-size: 14px;
-            line-height: 1.5;
-        }
-
-        /* -------------------------------------------------
-           Мобильная версия
-        ------------------------------------------------- */
-
-        @media (max-width: 640px) {
-            .page {
-                padding: 20px 12px;
-            }
+        @media (
+            max-width: 650px
+        ) {
 
             .container {
-                padding: 22px 16px;
+                padding: 20px 15px;
             }
 
-            h1 {
-                font-size: 23px;
+            .file {
+                align-items: flex-start;
+                flex-wrap: wrap;
             }
 
-            .drop-zone {
-                min-height: 190px;
-                padding: 20px;
+            .status {
+                width: 100%;
+                text-align: left;
             }
 
             .buttons button {
                 width: 100%;
             }
 
-            .file-item {
-                align-items: flex-start;
-            }
-
-            .file-item .btn-remove {
-                flex: 0 0 auto;
-            }
         }
+
     </style>
+
 </head>
+
 
 <body>
 
-<div class="page">
 
-    <div class="container">
+<div class="container">
 
-        <h1>📦 Пакетная загрузка Excel-файлов</h1>
+    <h1>
+        📦 Пакетная загрузка Excel
+    </h1>
 
-        <p class="description">
-            Выберите один или несколько Excel-файлов с отправлениями.
-            Файлы будут последовательно загружены и обработаны системой.
-        </p>
+    <p>
+        Выберите один или несколько файлов.
+        После загрузки система покажет
+        реальный статус обработки каждого файла.
+    </p>
 
 
-        <!-- ================================================
-             Flash-сообщения Flask
-        ================================================= -->
+    <input
+        id="fileInput"
+        type="file"
+        accept=".xlsx,.xls"
+        multiple
+    >
 
-        <div class="flash-messages">
 
-            {% with messages = get_flashed_messages(with_categories=true) %}
+    <div
+        id="dropZone"
+        class="drop-zone"
+    >
 
-                {% if messages %}
-
-                    {% for category, message in messages %}
-
-                        <div class="flash flash-{{ category }}">
-                            {{ message }}
-                        </div>
-
-                    {% endfor %}
-
-                {% endif %}
-
-            {% endwith %}
-
+        <div class="drop-icon">
+            📊
         </div>
 
+        <div class="drop-title">
+            Выберите Excel-файлы
+        </div>
 
-        <!-- ================================================
-             Форма
-        ================================================= -->
+        <div class="drop-description">
+            Можно выбрать несколько файлов
+            или перетащить их сюда
+        </div>
 
-        <form
-            id="uploadForm"
-            action="/upload"
-            method="post"
-            enctype="multipart/form-data"
+    </div>
+
+
+    <div class="buttons">
+
+        <button
+            id="selectButton"
+            class="btn-select"
         >
+            📂 Выбрать файлы
+        </button>
 
-            <!-- Скрытое поле файлов -->
-            <input
-                id="fileInput"
-                type="file"
-                name="files"
-                accept=".xlsx,.xls"
-                multiple
-            >
+        <button
+            id="uploadButton"
+            class="btn-upload"
+            disabled
+        >
+            🚀 Загрузить
+        </button>
 
+        <button
+            id="clearButton"
+            class="btn-clear"
+            disabled
+        >
+            🗑 Очистить
+        </button>
 
-            <!-- Drag & Drop -->
-
-            <div
-                id="dropZone"
-                class="drop-zone"
-                role="button"
-                tabindex="0"
-            >
-
-                <div class="drop-zone-icon">
-                    📊
-                </div>
-
-                <div class="drop-zone-title">
-                    Перетащите Excel-файлы сюда
-                </div>
-
-                <div class="drop-zone-text">
-                    или нажмите для выбора нескольких файлов
-                    <br>
-                    Поддерживаются файлы .xlsx и .xls
-                </div>
-
-            </div>
+    </div>
 
 
-            <!-- Список выбранных файлов -->
-
-            <div
-                id="filesSection"
-                class="files-section"
-            >
-
-                <div class="files-header">
-
-                    <h2 class="files-title">
-                        Выбранные файлы
-                    </h2>
-
-                    <div
-                        id="fileCounter"
-                        class="file-counter"
-                    >
-                        0 файлов
-                    </div>
-
-                </div>
+    <div
+        id="files"
+        class="files"
+    ></div>
 
 
-                <div
-                    id="fileList"
-                    class="file-list"
-                >
-                </div>
-
-            </div>
-
-
-            <!-- Кнопки -->
-
-            <div class="buttons">
-
-                <button
-                    id="selectButton"
-                    type="button"
-                    class="btn-select"
-                >
-                    📂 Выбрать файлы
-                </button>
-
-
-                <button
-                    id="uploadButton"
-                    type="submit"
-                    class="btn-upload"
-                    disabled
-                >
-                    🚀 Загрузить и обработать
-                </button>
-
-
-                <button
-                    id="clearButton"
-                    type="button"
-                    class="btn-clear"
-                    disabled
-                >
-                    🗑 Очистить список
-                </button>
-
-            </div>
-
-        </form>
-
-
-        <!-- ================================================
-             Прогресс загрузки
-        ================================================= -->
+    <div
+        id="progressWrapper"
+        class="progress-wrapper"
+    >
 
         <div
-            id="progressSection"
-            class="progress-section"
+            id="progressText"
+            class="progress-text"
         >
-
-            <div class="progress-info">
-
-                <div
-                    id="progressText"
-                    class="progress-text"
-                >
-                    Подготовка к загрузке...
-                </div>
-
-                <div
-                    id="progressPercent"
-                    class="progress-percent"
-                >
-                    0%
-                </div>
-
-            </div>
-
-
-            <div class="progress-bar">
-
-                <div
-                    id="progressValue"
-                    class="progress-value"
-                >
-                </div>
-
-            </div>
-
+            Подготовка...
         </div>
 
-
-        <!-- ================================================
-             Результат
-        ================================================= -->
-
-        <div
-            id="resultSection"
-            class="result-section"
-        >
+        <div class="progress-bar">
 
             <div
-                id="resultBox"
-                class="result-box"
-            >
-
-                <h2
-                    id="resultTitle"
-                    class="result-title"
-                >
-                </h2>
-
-                <ul
-                    id="resultList"
-                    class="result-list"
-                >
-                </ul>
-
-            </div>
-
-        </div>
-
-
-        <div class="hint">
-
-            <strong>ℹ Важно:</strong>
-            после загрузки файлы передаются на сервер для обработки.
-            Не закрывайте страницу до завершения пакетной загрузки.
+                id="progress"
+                class="progress"
+            ></div>
 
         </div>
 
     </div>
 
+
+    <div
+        id="result"
+        class="result"
+    ></div>
+
+
 </div>
 
 
 <script>
+
 "use strict";
 
 
-/* ============================================================
-   Получение элементов страницы
-============================================================ */
-
-const uploadForm =
-    document.getElementById("uploadForm");
-
 const fileInput =
-    document.getElementById("fileInput");
+    document.getElementById(
+        "fileInput"
+    );
+
 
 const dropZone =
-    document.getElementById("dropZone");
+    document.getElementById(
+        "dropZone"
+    );
+
 
 const selectButton =
-    document.getElementById("selectButton");
+    document.getElementById(
+        "selectButton"
+    );
+
 
 const uploadButton =
-    document.getElementById("uploadButton");
+    document.getElementById(
+        "uploadButton"
+    );
+
 
 const clearButton =
-    document.getElementById("clearButton");
+    document.getElementById(
+        "clearButton"
+    );
 
-const filesSection =
-    document.getElementById("filesSection");
 
-const fileList =
-    document.getElementById("fileList");
+const filesContainer =
+    document.getElementById(
+        "files"
+    );
 
-const fileCounter =
-    document.getElementById("fileCounter");
 
-const progressSection =
-    document.getElementById("progressSection");
+const progressWrapper =
+    document.getElementById(
+        "progressWrapper"
+    );
+
+
+const progress =
+    document.getElementById(
+        "progress"
+    );
+
 
 const progressText =
-    document.getElementById("progressText");
-
-const progressPercent =
-    document.getElementById("progressPercent");
-
-const progressValue =
-    document.getElementById("progressValue");
-
-const resultSection =
-    document.getElementById("resultSection");
-
-const resultBox =
-    document.getElementById("resultBox");
-
-const resultTitle =
-    document.getElementById("resultTitle");
-
-const resultList =
-    document.getElementById("resultList");
+    document.getElementById(
+        "progressText"
+    );
 
 
-/* ============================================================
-   Список выбранных файлов
-============================================================ */
+const result =
+    document.getElementById(
+        "result"
+    );
+
 
 let selectedFiles = [];
 
+let jobs = [];
 
-/* ============================================================
-   Проверка расширения
-============================================================ */
-
-function isExcelFile(file) {
-
-    const fileName =
-        file.name.toLowerCase();
-
-    return (
-        fileName.endsWith(".xlsx") ||
-        fileName.endsWith(".xls")
-    );
-}
+let pollingTimer = null;
 
 
 /* ============================================================
-   Форматирование размера файла
+   Выбор файлов
 ============================================================ */
 
-function formatFileSize(bytes) {
 
-    if (bytes === 0) {
-        return "0 Б";
+selectButton.addEventListener(
+    "click",
+    () => {
+
+        fileInput.click();
+
     }
+);
 
-    const units = [
-        "Б",
-        "КБ",
-        "МБ",
-        "ГБ"
-    ];
 
-    const index =
-        Math.floor(
-            Math.log(bytes) /
-            Math.log(1024)
+dropZone.addEventListener(
+    "click",
+    () => {
+
+        fileInput.click();
+
+    }
+);
+
+
+fileInput.addEventListener(
+    "change",
+    event => {
+
+        addFiles(
+            Array.from(
+                event.target.files
+            )
         );
 
-    const value =
-        bytes /
-        Math.pow(1024, index);
-
-    return (
-        value.toFixed(
-            index === 0 ? 0 : 2
-        )
-        + " "
-        + units[index]
-    );
-}
-
-
-/* ============================================================
-   Добавление файлов
-============================================================ */
-
-function addFiles(files) {
-
-    const newFiles =
-        Array.from(files);
-
-    let skippedFiles = 0;
-
-
-    for (const file of newFiles) {
-
-        if (!isExcelFile(file)) {
-
-            skippedFiles++;
-
-            continue;
-        }
-
-
-        /*
-         * Проверяем дубликаты.
-         * Сравнение выполняется по имени,
-         * размеру и времени изменения.
-         */
-
-        const alreadyExists =
-            selectedFiles.some(
-                existingFile =>
-
-                    existingFile.name ===
-                        file.name
-
-                    &&
-
-                    existingFile.size ===
-                        file.size
-
-                    &&
-
-                    existingFile.lastModified ===
-                        file.lastModified
-            );
-
-
-        if (!alreadyExists) {
-
-            selectedFiles.push(file);
-
-        }
+        fileInput.value = "";
 
     }
-
-
-    if (skippedFiles > 0) {
-
-        showResult(
-            "Некоторые файлы пропущены",
-            [
-                "Разрешены только файлы .xlsx и .xls."
-            ],
-            false
-        );
-
-    }
-
-
-    updateFileList();
-
-}
-
-
-/* ============================================================
-   Удаление файла
-============================================================ */
-
-function removeFile(index) {
-
-    selectedFiles.splice(index, 1);
-
-    updateFileList();
-
-}
-
-
-/* ============================================================
-   Очистка списка
-============================================================ */
-
-function clearFiles() {
-
-    selectedFiles = [];
-
-    fileInput.value = "";
-
-    updateFileList();
-
-    hideProgress();
-
-}
-
-
-/* ============================================================
-   Обновление списка файлов
-============================================================ */
-
-function updateFileList() {
-
-    fileList.innerHTML = "";
-
-
-    const count =
-        selectedFiles.length;
-
-
-    if (count === 0) {
-
-        filesSection.classList.remove(
-            "visible"
-        );
-
-        uploadButton.disabled = true;
-
-        clearButton.disabled = true;
-
-        fileCounter.textContent =
-            "0 файлов";
-
-        return;
-
-    }
-
-
-    filesSection.classList.add(
-        "visible"
-    );
-
-
-    uploadButton.disabled = false;
-
-    clearButton.disabled = false;
-
-
-    fileCounter.textContent =
-        count === 1
-            ? "1 файл"
-            : `${count} файлов`;
-
-
-    selectedFiles.forEach(
-        (file, index) => {
-
-            const item =
-                document.createElement("div");
-
-            item.className =
-                "file-item";
-
-
-            const icon =
-                document.createElement("div");
-
-            icon.className =
-                "file-item-icon";
-
-            icon.textContent =
-                "📄";
-
-
-            const info =
-                document.createElement("div");
-
-            info.className =
-                "file-info";
-
-
-            const name =
-                document.createElement("div");
-
-            name.className =
-                "file-name";
-
-            name.textContent =
-                file.name;
-
-
-            const size =
-                document.createElement("div");
-
-            size.className =
-                "file-size";
-
-            size.textContent =
-                formatFileSize(file.size);
-
-
-            info.appendChild(name);
-
-            info.appendChild(size);
-
-
-            const removeButton =
-                document.createElement("button");
-
-            removeButton.type =
-                "button";
-
-            removeButton.className =
-                "btn-remove";
-
-            removeButton.textContent =
-                "Удалить";
-
-
-            removeButton.addEventListener(
-                "click",
-                () => {
-                    removeFile(index);
-                }
-            );
-
-
-            item.appendChild(icon);
-
-            item.appendChild(info);
-
-            item.appendChild(removeButton);
-
-
-            fileList.appendChild(item);
-
-        }
-    );
-
-}
-
-
-/* ============================================================
-   Синхронизация массива с input type=file
-============================================================ */
-
-function syncFilesToInput() {
-
-    const dataTransfer =
-        new DataTransfer();
-
-
-    selectedFiles.forEach(
-        file => {
-            dataTransfer.items.add(file);
-        }
-    );
-
-
-    fileInput.files =
-        dataTransfer.files;
-
-}
+);
 
 
 /* ============================================================
    Drag & Drop
 ============================================================ */
+
 
 [
     "dragenter",
@@ -1086,8 +494,6 @@ function syncFilesToInput() {
             event => {
 
                 event.preventDefault();
-
-                event.stopPropagation();
 
                 dropZone.classList.add(
                     "dragover"
@@ -1112,8 +518,6 @@ function syncFilesToInput() {
 
                 event.preventDefault();
 
-                event.stopPropagation();
-
                 dropZone.classList.remove(
                     "dragover"
                 );
@@ -1129,419 +533,308 @@ dropZone.addEventListener(
     "drop",
     event => {
 
-        const files =
-            event.dataTransfer.files;
-
-        addFiles(files);
-
-    }
-);
-
-
-/* ============================================================
-   Выбор файлов
-============================================================ */
-
-selectButton.addEventListener(
-    "click",
-    () => {
-
-        fileInput.click();
-
-    }
-);
-
-
-dropZone.addEventListener(
-    "click",
-    () => {
-
-        fileInput.click();
-
-    }
-);
-
-
-dropZone.addEventListener(
-    "keydown",
-    event => {
-
-        if (
-            event.key === "Enter" ||
-            event.key === " "
-        ) {
-
-            event.preventDefault();
-
-            fileInput.click();
-
-        }
-
-    }
-);
-
-
-fileInput.addEventListener(
-    "change",
-    event => {
-
         addFiles(
-            event.target.files
-        );
-
-        /*
-         * Очищаем input.
-         * Это позволяет повторно выбрать
-         * тот же файл после удаления.
-         */
-
-        fileInput.value = "";
-
-    }
-);
-
-
-/* ============================================================
-   Очистка списка
-============================================================ */
-
-clearButton.addEventListener(
-    "click",
-    clearFiles
-);
-
-
-/* ============================================================
-   Прогресс
-============================================================ */
-
-function showProgress() {
-
-    progressSection.classList.add(
-        "visible"
-    );
-
-    setProgress(
-        0,
-        "Подготовка файлов..."
-    );
-
-}
-
-
-function hideProgress() {
-
-    progressSection.classList.remove(
-        "visible"
-    );
-
-}
-
-
-function setProgress(
-    percent,
-    text
-) {
-
-    const safePercent =
-        Math.max(
-            0,
-            Math.min(
-                100,
-                percent
+            Array.from(
+                event.dataTransfer.files
             )
         );
 
-
-    progressValue.style.width =
-        `${safePercent}%`;
-
-
-    progressPercent.textContent =
-        `${Math.round(safePercent)}%`;
+    }
+);
 
 
-    progressText.textContent =
-        text;
+/* ============================================================
+   Добавление файлов
+============================================================ */
+
+
+function addFiles(files) {
+
+    for (
+        const file
+        of files
+    ) {
+
+        const name =
+            file.name.toLowerCase();
+
+        if (
+            !name.endsWith(".xlsx")
+            &&
+            !name.endsWith(".xls")
+        ) {
+
+            continue;
+
+        }
+
+
+        const duplicate =
+            selectedFiles.some(
+                existing =>
+                    existing.name ===
+                    file.name
+                    &&
+                    existing.size ===
+                    file.size
+            );
+
+
+        if (!duplicate) {
+
+            selectedFiles.push(
+                file
+            );
+
+        }
+
+    }
+
+
+    renderFiles();
 
 }
 
 
 /* ============================================================
-   Результаты
+   Отображение списка
 ============================================================ */
 
-function showResult(
-    title,
-    messages,
-    success
-) {
 
-    resultSection.classList.add(
-        "visible"
-    );
+function renderFiles() {
+
+    filesContainer.innerHTML = "";
 
 
-    resultTitle.textContent =
-        title;
+    selectedFiles.forEach(
+        (file, index) => {
+
+            const element =
+                document.createElement(
+                    "div"
+                );
+
+            element.className =
+                "file";
 
 
-    resultTitle.className =
-        success
-            ? "result-title result-success"
-            : "result-title result-error";
+            element.innerHTML = `
+
+                <div>
+                    📄
+                </div>
+
+                <div class="file-info">
+
+                    <div class="file-name">
+                        ${escapeHtml(
+                            file.name
+                        )}
+                    </div>
+
+                    <div class="file-size">
+                        ${formatSize(
+                            file.size
+                        )}
+                    </div>
+
+                </div>
+
+                <div class="status">
+                    Готов к загрузке
+                </div>
+
+                <button
+                    class="remove"
+                    type="button"
+                    onclick="removeFile(${index})"
+                >
+                    Удалить
+                </button>
+
+            `;
 
 
-    resultBox.innerHTML =
-        "";
-
-
-    resultBox.appendChild(
-        resultTitle
-    );
-
-
-    const list =
-        document.createElement("ul");
-
-    list.className =
-        "result-list";
-
-
-    messages.forEach(
-        message => {
-
-            const item =
-                document.createElement("li");
-
-            item.textContent =
-                message;
-
-            list.appendChild(item);
+            filesContainer.appendChild(
+                element
+            );
 
         }
     );
 
 
-    resultBox.appendChild(list);
+    uploadButton.disabled =
+        selectedFiles.length === 0;
+
+
+    clearButton.disabled =
+        selectedFiles.length === 0;
 
 }
 
 
 /* ============================================================
-   Пакетная загрузка
+   Удаление
 ============================================================ */
 
-uploadForm.addEventListener(
-    "submit",
-    async event => {
 
-        event.preventDefault();
+function removeFile(index) {
 
+    selectedFiles.splice(
+        index,
+        1
+    );
+
+    renderFiles();
+
+}
+
+
+clearButton.addEventListener(
+    "click",
+    () => {
+
+        selectedFiles = [];
+
+        jobs = [];
+
+        renderFiles();
+
+        result.className =
+            "result";
+
+        result.textContent = "";
+
+        progressWrapper.classList.remove(
+            "visible"
+        );
+
+    }
+);
+
+
+/* ============================================================
+   Загрузка
+============================================================ */
+
+
+uploadButton.addEventListener(
+    "click",
+    async () => {
 
         if (
             selectedFiles.length === 0
         ) {
-
-            showResult(
-                "Файлы не выбраны",
-                [
-                    "Выберите хотя бы один Excel-файл."
-                ],
-                false
-            );
-
             return;
-
         }
 
 
-        /*
-         * Блокируем кнопки,
-         * чтобы пользователь не запустил
-         * вторую параллельную загрузку.
-         */
+        uploadButton.disabled =
+            true;
 
-        uploadButton.disabled = true;
+        clearButton.disabled =
+            true;
 
-        clearButton.disabled = true;
-
-        selectButton.disabled = true;
+        selectButton.disabled =
+            true;
 
 
-        resultSection.classList.remove(
+        progressWrapper.classList.add(
             "visible"
         );
 
 
-        showProgress();
+        progressText.textContent =
+            "Загрузка файлов...";
 
 
-        const results = [];
-
-        let successCount = 0;
-
-        let errorCount = 0;
+        progress.style.width =
+            "0%";
 
 
-        /*
-         * Последовательная загрузка файлов.
-         *
-         * Это специально сделано по одному файлу,
-         * чтобы не создавать параллельную нагрузку
-         * и избежать конфликтов watchdog/Excel/SQLite.
-         */
-
-        for (
-            let index = 0;
-            index < selectedFiles.length;
-            index++
-        ) {
-
-            const file =
-                selectedFiles[index];
+        const formData =
+            new FormData();
 
 
-            const startPercent =
-                (
-                    index /
-                    selectedFiles.length
-                )
-                * 100;
-
-
-            setProgress(
-                startPercent,
-                `Загрузка ${index + 1} из ${selectedFiles.length}: ${file.name}`
-            );
-
-
-            try {
-
-                const formData =
-                    new FormData();
-
-                /*
-                 * Важно:
-                 * используется имя "file",
-                 * чтобы сохранить совместимость
-                 * с существующим Flask route /upload.
-                 */
+        selectedFiles.forEach(
+            file => {
 
                 formData.append(
-                    "file",
+                    "files",
                     file
                 );
 
-
-                const response =
-                    await fetch(
-                        uploadForm.action,
-                        {
-                            method: "POST",
-                            body: formData,
-                            credentials: "same-origin"
-                        }
-                    );
+            }
+        );
 
 
-                if (!response.ok) {
+        try {
 
-                    throw new Error(
-                        `Ошибка сервера: ${response.status}`
-                    );
-
-                }
-
-
-                successCount++;
-
-
-                results.push(
-                    `✓ ${file.name} — успешно загружен`
+            const response =
+                await fetch(
+                    "/upload",
+                    {
+                        method: "POST",
+                        body: formData
+                    }
                 );
 
-            } catch (error) {
 
-                errorCount++;
+            const data =
+                await response.json();
 
 
-                results.push(
-                    `✗ ${file.name} — ${error.message}`
+            if (
+                !response.ok
+                ||
+                !data.success
+            ) {
+
+                throw new Error(
+                    data.error
+                    ||
+                    "Ошибка загрузки"
                 );
 
             }
 
 
-            const endPercent =
-                (
-                    (
-                        index + 1
-                    )
-                    /
-                    selectedFiles.length
-                )
-                * 100;
+            jobs =
+                data.jobs.filter(
+                    job =>
+                        job.success
+                );
 
 
-            setProgress(
-                endPercent,
-                `Обработано файлов: ${index + 1} из ${selectedFiles.length}`
+            updateStatuses(
+                data.jobs
             );
 
-        }
+
+            progressText.textContent =
+                "Файлы загружены. Ожидание обработки...";
 
 
-        if (errorCount === 0) {
+            startPolling();
 
-            showResult(
-                "✓ Пакетная загрузка завершена",
-                [
-                    `Успешно обработано файлов: ${successCount}.`,
-                    ...results
-                ],
-                true
-            );
 
-        } else if (successCount === 0) {
+        } catch (error) {
 
             showResult(
-                "✗ Не удалось загрузить файлы",
-                results,
+                "Ошибка загрузки: "
+                + error.message,
                 false
             );
 
-        } else {
 
-            showResult(
-                "⚠ Пакетная загрузка завершена с ошибками",
-                [
-                    `Успешно: ${successCount}.`,
-                    `Ошибок: ${errorCount}.`,
-                    ...results
-                ],
-                false
-            );
+            uploadButton.disabled =
+                false;
 
-        }
+            clearButton.disabled =
+                false;
 
-
-        uploadButton.disabled = false;
-
-        clearButton.disabled = false;
-
-        selectButton.disabled = false;
-
-
-        /*
-         * Если всё успешно, очищаем список.
-         */
-
-        if (errorCount === 0) {
-
-            selectedFiles = [];
-
-            updateFileList();
+            selectButton.disabled =
+                false;
 
         }
 
@@ -1549,7 +842,453 @@ uploadForm.addEventListener(
 );
 
 
+/* ============================================================
+   Опрос статусов
+============================================================ */
+
+
+function startPolling() {
+
+    if (pollingTimer) {
+
+        clearInterval(
+            pollingTimer
+        );
+
+    }
+
+
+    pollStatuses();
+
+
+    pollingTimer =
+        setInterval(
+            pollStatuses,
+            500
+        );
+
+}
+
+
+async function pollStatuses() {
+
+    if (
+        jobs.length === 0
+    ) {
+
+        stopPolling();
+
+        return;
+
+    }
+
+
+    const statuses = [];
+
+
+    for (
+        const job
+        of jobs
+    ) {
+
+        try {
+
+            const response =
+                await fetch(
+                    "/upload/status/"
+                    + encodeURIComponent(
+                        job.job_id
+                    ),
+                    {
+                        cache: "no-store"
+                    }
+                );
+
+
+            if (
+                !response.ok
+            ) {
+                continue;
+            }
+
+
+            const data =
+                await response.json();
+
+
+            if (
+                data.success
+                &&
+                data.job
+            ) {
+
+                statuses.push(
+                    data.job
+                );
+
+            }
+
+        } catch (
+            error
+        ) {
+
+            console.error(
+                error
+            );
+
+        }
+
+    }
+
+
+    if (
+        statuses.length > 0
+    ) {
+
+        updateStatuses(
+            statuses
+        );
+
+    }
+
+
+    const completed =
+        statuses.filter(
+            job =>
+                job.status ===
+                    "completed"
+                ||
+                job.status ===
+                    "error"
+        ).length;
+
+
+    const total =
+        jobs.length;
+
+
+    const percent =
+        total > 0
+            ? (
+                completed
+                /
+                total
+            ) * 100
+            : 0;
+
+
+    progress.style.width =
+        percent + "%";
+
+
+    progressText.textContent =
+        `Обработано: ${completed} из ${total}`;
+
+
+    if (
+        completed >= total
+        &&
+        total > 0
+    ) {
+
+        stopPolling();
+
+        const errors =
+            statuses.filter(
+                job =>
+                    job.status ===
+                    "error"
+            );
+
+
+        if (
+            errors.length === 0
+        ) {
+
+            showResult(
+                `✓ Все файлы успешно обработаны: ${total}`,
+                true
+            );
+
+        } else {
+
+            showResult(
+                `⚠ Обработка завершена. Успешно: ${total - errors.length}, ошибок: ${errors.length}`,
+                false
+            );
+
+        }
+
+
+        uploadButton.disabled =
+            false;
+
+        clearButton.disabled =
+            false;
+
+        selectButton.disabled =
+            false;
+
+    }
+
+}
+
+
+/* ============================================================
+   Остановка опроса
+============================================================ */
+
+
+function stopPolling() {
+
+    if (pollingTimer) {
+
+        clearInterval(
+            pollingTimer
+        );
+
+        pollingTimer = null;
+
+    }
+
+}
+
+
+/* ============================================================
+   Обновление статусов
+============================================================ */
+
+
+function updateStatuses(
+    statuses
+) {
+
+    const elements =
+        filesContainer.children;
+
+
+    statuses.forEach(
+        job => {
+
+            const index =
+                selectedFiles.findIndex(
+                    file =>
+                        file.name ===
+                        job.filename
+                );
+
+
+            if (
+                index < 0
+            ) {
+                return;
+            }
+
+
+            const element =
+                elements[index];
+
+            if (!element) {
+                return;
+            }
+
+
+            const statusElement =
+                element.querySelector(
+                    ".status"
+                );
+
+
+            if (!statusElement) {
+                return;
+            }
+
+
+            statusElement.className =
+                "status "
+                +
+                "status-"
+                +
+                job.status;
+
+
+            statusElement.textContent =
+                getStatusText(
+                    job
+                );
+
+
+            /*
+             * Убираем кнопку удаления,
+             * когда обработка уже завершена.
+             */
+
+            if (
+                job.status ===
+                    "completed"
+                ||
+                job.status ===
+                    "error"
+            ) {
+
+                const button =
+                    element.querySelector(
+                        ".remove"
+                    );
+
+                if (button) {
+                    button.remove();
+                }
+
+            }
+
+        }
+    );
+
+}
+
+
+/* ============================================================
+   Текст статуса
+============================================================ */
+
+
+function getStatusText(
+    job
+) {
+
+    switch (
+        job.status
+    ) {
+
+        case "uploaded":
+
+            return "⬆ Загружен";
+
+
+        case "waiting":
+
+            return "⏳ Ожидает обработки";
+
+
+        case "processing":
+
+            return "⚙ Обрабатывается";
+
+
+        case "completed":
+
+            return "✓ Обработан";
+
+
+        case "error":
+
+            return "✗ Ошибка";
+
+
+        default:
+
+            return job.message
+                || "Неизвестный статус";
+
+    }
+
+}
+
+
+/* ============================================================
+   Результат
+============================================================ */
+
+
+function showResult(
+    message,
+    success
+) {
+
+    result.className =
+        "result "
+        +
+        (
+            success
+                ? "success"
+                : "error"
+        );
+
+
+    result.textContent =
+        message;
+
+}
+
+
+/* ============================================================
+   Формат размера
+============================================================ */
+
+
+function formatSize(
+    bytes
+) {
+
+    if (
+        bytes < 1024
+    ) {
+
+        return bytes + " Б";
+
+    }
+
+
+    if (
+        bytes < 1024 * 1024
+    ) {
+
+        return (
+            bytes / 1024
+        ).toFixed(1)
+        + " КБ";
+
+    }
+
+
+    return (
+        bytes
+        /
+        1024
+        /
+        1024
+    ).toFixed(1)
+    + " МБ";
+
+}
+
+
+/* ============================================================
+   Защита HTML
+============================================================ */
+
+
+function escapeHtml(
+    value
+) {
+
+    const div =
+        document.createElement(
+            "div"
+        );
+
+    div.textContent =
+        value;
+
+    return div.innerHTML;
+
+}
+
+
 </script>
 
+
 </body>
+
 </html>
