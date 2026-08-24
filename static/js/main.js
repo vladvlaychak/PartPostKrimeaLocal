@@ -1,104 +1,133 @@
-document.addEventListener('DOMContentLoaded', () => {
-  const table = document.getElementById('shipmentsTable');
-  const tbody = table.querySelector('tbody');
-  const rows = Array.from(tbody.querySelectorAll('tr'));
-  const headers = Array.from(table.querySelectorAll('th'));
+document.addEventListener("DOMContentLoaded", () => {
+    const input = document.getElementById("shipmentNumber");
+    const searchButton = document.getElementById("shipmentSearchButton");
+    const clearButton = document.getElementById("shipmentClearButton");
+    const status = document.getElementById("shipmentSearchStatus");
+    const result = document.getElementById("shipmentSearchResult");
+    const statsBadge = document.getElementById("statsBadge");
+    const filtersForm = document.getElementById("filtersForm");
+    const searchInput = document.getElementById("searchInput");
+    let searchMode = "shpi";
 
-  const searchInput = document.getElementById('searchInput');
-  const dateFromInput = document.getElementById('dateFrom');
-  const dateToInput = document.getElementById('dateTo');
-
-  let currentSortField = null;
-  let isAscending = true;
-
-  function getCellValue(row, field) {
-    const cell = row.querySelector(`td[data-field="${field}"]`) || row.cells[headers.findIndex(h => h.getAttribute('data-field') === field)];
-    if (!cell) return '';
-
-    const text = cell.innerText.trim();
-
-    if (['mass', 'shipping_cost'].includes(field)) {
-      const num = parseFloat(text.replace(/\s/g, '').replace('₽', ''));
-      return isNaN(num) ? 0 : num;
+    function normalize(value) {
+        return String(value || "").trim().toUpperCase().replace(/[^A-ZА-ЯЁ0-9]+/g, "");
+    }
+    function escapeHtml(value) {
+        const el = document.createElement("div");
+        el.textContent = value == null ? "" : String(value);
+        return el.innerHTML;
+    }
+    function setStatus(message, type = "") {
+        status.textContent = message;
+        status.className = `shipment-search-status ${type}`;
+    }
+    function clearResult() {
+        result.hidden = true;
+        result.innerHTML = "";
+        setStatus("");
+    }
+    function formatNumber(value) {
+        if (value === null || value === undefined || value === "") return "—";
+        const n = Number(value);
+        return Number.isNaN(n) ? escapeHtml(value) : n.toLocaleString("ru-RU", {maximumFractionDigits: 2});
+    }
+    function formatDate(value) {
+        return value ? String(value).replace("T", " ").substring(0, 19) : "—";
+    }
+    function shipmentCard(shipment) {
+        return `<div class="shipment-result-header"><span class="result-success-icon">✓</span><div><div class="result-title">ОТПРАВЛЕНИЕ НАЙДЕНО</div><div class="result-number">${escapeHtml(shipment.shpi)}</div></div></div>
+        <div class="shipment-result-grid">
+        <div class="result-item"><span>Внутренний номер</span><strong>${escapeHtml(shipment.internal_number || "—")}</strong></div>
+        <div class="result-item"><span>Получатель</span><strong>${escapeHtml(shipment.recipient || "—")}</strong></div>
+        <div class="result-item"><span>Телефон</span><strong>${escapeHtml(shipment.phone || "—")}</strong></div>
+        <div class="result-item"><span>Почтовый индекс</span><strong>${escapeHtml(shipment.index_code || "—")}</strong></div>
+        <div class="result-item"><span>Масса</span><strong>${formatNumber(shipment.mass)}</strong></div>
+        <div class="result-item"><span>Стоимость</span><strong>${formatNumber(shipment.shipping_cost)} ₽</strong></div>
+        <div class="result-item result-item-full"><span>Адрес</span><strong>${escapeHtml(shipment.address || "—")}</strong></div>
+        <div class="result-item result-item-full"><span>Комментарий</span><strong>${escapeHtml(shipment.comment || "—")}</strong></div>
+        <div class="result-item"><span>Дата загрузки</span><strong>${escapeHtml(formatDate(shipment.uploaded_at))}</strong></div>
+        </div>`;
+    }
+    function renderShipments(shipments) {
+        result.innerHTML = shipments.map(shipmentCard).join("");
+        result.hidden = false;
+    }
+    async function search() {
+        const number = normalize(input.value);
+        clearResult();
+        if (!number) {
+            setStatus(searchMode === "shpi" ? "Введите номер отправления" : "Введите внутренний номер", "status-warning");
+            input.focus(); return;
+        }
+        input.value = number;
+        searchButton.disabled = true;
+        const oldText = searchButton.textContent;
+        searchButton.textContent = "Поиск...";
+        setStatus("Выполняется поиск...", "status-loading");
+        try {
+            const url = searchMode === "shpi"
+                ? `/api/shipment?shpi=${encodeURIComponent(number)}`
+                : `/api/internal-number?number=${encodeURIComponent(number)}`;
+            const response = await fetch(url, {headers: {"Accept": "application/json"}});
+            const data = await response.json();
+            if (!response.ok) throw new Error(data.message || "Ошибка выполнения поиска");
+            if (!data.found) {
+                setStatus(data.message || "Ничего не найдено", "status-not-found"); return;
+            }
+            const shipments = searchMode === "shpi" ? [data.shipment] : data.shipments;
+            setStatus(shipments.length > 1 ? `Найдено отправлений: ${shipments.length}` : "Отправление найдено", "status-success");
+            renderShipments(shipments);
+            result.scrollIntoView({behavior: "smooth", block: "nearest"});
+        } catch (error) {
+            console.error(error);
+            setStatus(error.message || "Не удалось выполнить поиск", "status-error");
+        } finally {
+            searchButton.disabled = false;
+            searchButton.textContent = oldText;
+        }
     }
 
-    return text.toLowerCase();
-  }
+    document.querySelectorAll(".search-mode").forEach(button => {
+        button.addEventListener("click", () => {
+            searchMode = button.dataset.mode;
+            document.querySelectorAll(".search-mode").forEach(b => b.classList.toggle("active", b === button));
+            input.value = "";
+            clearResult();
+            input.placeholder = searchMode === "shpi" ? "Например: RA123456789RU" : "Например: 123456";
+            input.focus();
+        });
+    });
+    searchButton.addEventListener("click", search);
+    input.addEventListener("keydown", event => {
+        if (event.key === "Enter") { event.preventDefault(); search(); }
+        if (event.key === "Escape") { input.value = ""; clearResult(); input.focus(); }
+    });
+    clearButton.addEventListener("click", () => { input.value = ""; clearResult(); input.focus(); });
 
-  function sortTable(field) {
-    if (currentSortField === field) {
-      isAscending = !isAscending;
-    } else {
-      currentSortField = field;
-      isAscending = true;
+    document.querySelectorAll(".shpi-button").forEach(button => {
+        button.addEventListener("click", () => {
+            searchMode = "shpi";
+            document.querySelectorAll(".search-mode").forEach(b => b.classList.toggle("active", b.dataset.mode === "shpi"));
+            input.value = button.dataset.shpi || "";
+            window.scrollTo({top: 0, behavior: "smooth"});
+            setTimeout(search, 250);
+        });
+    });
+
+    if (searchInput && filtersForm) {
+        let timeoutId;
+        searchInput.addEventListener("input", () => {
+            clearTimeout(timeoutId);
+            timeoutId = setTimeout(() => filtersForm.submit(), 500);
+        });
     }
 
-    headers.forEach(h => {
-      h.classList.remove('sorted-asc', 'sorted-desc');
-      if (h.getAttribute('data-field') === currentSortField) {
-        h.classList.add(isAscending ? 'sorted-asc' : 'sorted-desc');
-      }
-    });
-
-    const sortedRows = [...rows].sort((a, b) => {
-      const aVal = getCellValue(a, field);
-      const bVal = getCellValue(b, field);
-
-      if (typeof aVal === 'number' && typeof bVal === 'number') {
-        return isAscending ? aVal - bVal : bVal - aVal;
-      } else {
-        if (aVal < bVal) return isAscending ? -1 : 1;
-        if (aVal > bVal) return isAscending ? 1 : -1;
-        return 0;
-      }
-    });
-
-    tbody.innerHTML = '';
-    sortedRows.forEach(row => tbody.appendChild(row));
-
-    applyFilters();
-  }
-
-  function applyFilters() {
-    const searchTerm = searchInput.value.toLowerCase();
-    const fromDate = dateFromInput.value;
-    const toDate = dateToInput.value;
-
-    rows.forEach(row => {
-      const matchesSearch = row.innerText.toLowerCase().includes(searchTerm);
-
-      const dateCell = row.querySelector('td[data-date]');
-      const rowDateStr = dateCell ? dateCell.getAttribute('data-date') : '';
-
-      let matchesDateRange = true;
-
-      if (fromDate && rowDateStr) {
-        if (rowDateStr < fromDate) matchesDateRange = false;
-      }
-
-      if (toDate && rowDateStr) {
-        const toEndOfDay = `${toDate}T23:59:59`;
-        if (rowDateStr > toEndOfDay) matchesDateRange = false;
-      }
-
-      row.style.display = (matchesSearch && matchesDateRange) ? '' : 'none';
-    });
-  }
-
-  headers.forEach(header => {
-    header.addEventListener('click', () => {
-      const field = header.getAttribute('data-field');
-      if (field) sortTable(field);
-    });
-  });
-
-  searchInput.addEventListener('input', applyFilters);
-  dateFromInput.addEventListener('change', applyFilters);
-  dateToInput.addEventListener('change', applyFilters);
-
-  dateToInput.valueAsDate = new Date();
+    fetch("/api/stats")
+        .then(r => r.json())
+        .then(data => {
+            if (data.success && data.stats) {
+                statsBadge.textContent = `В базе: ${Number(data.stats.total || 0).toLocaleString("ru-RU")}`;
+            }
+        })
+        .catch(() => { statsBadge.textContent = "Статистика недоступна"; });
 });
-  
-
-
-
