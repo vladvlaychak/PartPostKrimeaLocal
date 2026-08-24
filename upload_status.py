@@ -1,127 +1,98 @@
-from __future__ import annotations
-
+from datetime import datetime
 import os
-import threading
-import time
-from typing import Any
+from openpyxl import load_workbook
+from db import get_db_connection
+from config import FIELD_MAP
+from sqlite3 import IntegrityError
 
+def normalize_header(h):
+    if not h:
+        return ""
+    h = str(h).strip().lower()
+    for ch in " -–—":
+        h = h.replace(ch, "_")
+    return h
 
-_lock = threading.RLock()
+def process_xlsx_file(file_path):
+    """
+    Читает XLSX, вставляет данные в SQLite, затем удаляет файл.
+    Возвращает (success: bool, message: str)
+    """
+    upload_time = datetime.utcnow().isoformat()
 
-_jobs: dict[str, dict[str, Any]] = {}
+    try:
+        wb = load_workbook(filename=file_path, data_only=True, read_only=True)
+        ws = wb.active
 
-_path_to_job: dict[str, str] = {}
+        if ws.max_row < 2:
+            return False, "Файл слишком короткий: нет данных для загрузки"
 
+        headers_raw = [cell.value for cell in ws[1]]
+        headers = [normalize_header(h) for h in headers_raw]
 
-def normalize_path(path: str) -> str:
-    return os.path.normcase(
-        os.path.abspath(
-            os.path.normpath(path)
-        )
-    )
+        mapping = {field: None for field in FIELD_MAP}
+        for idx, h in enumerate(headers):
+            for field, keywords in FIELD_MAP.items():
+                if mapping[field] is not None:
+                    continue
+                for kw in keywords:
+                    if kw in h:
+                        mapping[field] = idx
+                        break
 
+        missing = [f for f, idx in mapping.items() if idx is None]
+        if missing:
+            return False, f"Не найдены колонки для полей: {', '.join(missing)}. Проверьте заголовки в Excel."
 
-def create_job(
-    job_id: str,
-    filename: str,
-    file_path: str,
-) -> None:
+        conn = get_db_connection()
+        cur = conn.cursor()
+        insert_sql = """
+            INSERT INTO shipments (shpi, mass, shipping_cost, recipient, phone, index_code, address, internal_number, comment, uploaded_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """
 
-    normalized_path = normalize_path(file_path)
+        count = 0
+        duplicates = 0
+        errors = 0
 
-    with _lock:
-        _jobs[job_id] = {
-            "job_id": job_id,
-            "filename": filename,
-            "file_path": normalized_path,
-            "status": "uploaded",
-            "message": "Файл загружен и ожидает обработки",
-            "created_at": time.time(),
-            "updated_at": time.time(),
-        }
+        for row_idx, row in enumerate(ws.iter_rows(min_row=2), start=2):
+            try:
+                shpi_val = row[mapping["shpi"]].value
+                if shpi_val is None or str(shpi_val).strip() == "":
+                    continue
+                shpi = str(shpi_val).strip()
 
-        _path_to_job[normalized_path] = job_id
+                mass = row[mapping["mass"]].value
+                shipping_cost = row[mapping["shipping_cost"]].value
 
+                recipient = str(row[mapping["recipient"]].value).strip() if row[mapping["recipient"]].value else ""
+                phone = str(row[mapping["phone"]].value).strip() if row[mapping["phone"]].value else ""
+                index_code = str(row[mapping["index_code"]].value).strip() if row[mapping["index_code"]].value else ""
+                address = str(row[mapping["address"]].value).strip() if row[mapping["address"]].value else ""
+                internal_number = str(row[mapping["internal_number"]].value).strip() if row[mapping["internal_number"]].value else ""
+                comment = str(row[mapping["comment"]].value).strip() if row[mapping["comment"]].value else ""
 
-def update_job(
-    job_id: str,
-    status: str,
-    message: str,
-) -> None:
+                cur.execute(insert_sql, (shpi, mass, shipping_cost, recipient, phone, index_code, address, internal_number, comment, upload_time))
+                count += 1
 
-    with _lock:
+            except IntegrityError:
+                duplicates += 1
+                continue
+            except Exception as e:
+                errors += 1
+                print(f"Ошибка строки {row_idx} в файле {file_path}: {e}")
 
-        job = _jobs.get(job_id)
+        conn.commit()
+        conn.close()
+        wb.close()
 
-        if job is None:
-            return
+        os.remove(file_path)
+        msg = f"Обработано строк: {count}, пропущено дублей: {duplicates}, ошибок: {errors}"
+        print(f"[WATCHDOG] Успешно: {msg}")
+        return True, msg
 
-        job["status"] = status
-        job["message"] = message
-        job["updated_at"] = time.time()
-
-
-def update_job_by_path(
-    file_path: str,
-    status: str,
-    message: str,
-) -> None:
-
-    normalized_path = normalize_path(file_path)
-
-    with _lock:
-        job_id = _path_to_job.get(normalized_path)
-
-    if job_id:
-        update_job(
-            job_id,
-            status,
-            message,
-        )
-
-
-def get_job(job_id: str) -> dict[str, Any] | None:
-
-    with _lock:
-
-        job = _jobs.get(job_id)
-
-        if job is None:
-            return None
-
-        return dict(job)
-
-
-def get_jobs(
-    job_ids: list[str],
-) -> list[dict[str, Any]]:
-
-    with _lock:
-
-        result = []
-
-        for job_id in job_ids:
-
-            job = _jobs.get(job_id)
-
-            if job is not None:
-                result.append(dict(job))
-
-        return result
-
-
-def remove_job(job_id: str) -> None:
-
-    with _lock:
-
-        job = _jobs.pop(job_id, None)
-
-        if job is not None:
-
-            file_path = job.get("file_path")
-
-            if file_path:
-                _path_to_job.pop(
-                    normalize_path(file_path),
-                    None,
-                )
+    except Exception as e:
+        msg = str(e)
+        print(f"[WATCHDOG] Ошибка обработки файла {file_path}: {msg}")
+        # Файл НЕ удаляем при ошибке
+        return False, msg
