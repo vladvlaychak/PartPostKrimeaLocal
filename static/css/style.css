@@ -1,0 +1,206 @@
+:root {
+  --primary: #3b82f6;
+  --primary-hover: #2563eb;
+  --bg: #f3f4f6;
+  --surface: #ffffff;
+  --text: #1f2937;
+  --text-secondary: #6b7280;
+  --border: #e5e7eb;
+  --success: #10b981;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  padding: 0;
+  min-height: 100vh;
+  background-color: var(--bg);
+  color: var(--text);
+  font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+  display: flex;
+  flex-direction: column;
+}
+
+#app {
+  width: 100%;
+  max-width: 100%;
+  padding: 16px;
+  flex: 1;
+}
+
+h1 {
+  margin-top: 0;
+  font-size: 1.5rem;
+  color: var(--text);
+  margin-bottom: 20px;
+}
+
+.flash-messages { margin-bottom: 20px; }
+.flash {
+  padding: 12px 16px;
+  border-radius: 8px;
+  margin-bottom: 8px;
+  font-size: 0.95rem;
+}
+.flash-success { background-color: #d1fae5; color: #065f46; border: 1px solid #a7f3d0; }
+.flash-error { background-color: #fee2e2; color: #991b1b; border: 1px solid #fecaca; }
+
+.controls-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  align-items: flex-start;
+  margin-bottom: 24px;
+  background: var(--surface);
+  padding: 16px;
+  border-radius: 12px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+}
+
+.control-item {
+  display: flex;
+  flex-direction: column;
+  min-width: 220px;
+  flex: 1 1 220px;
+}
+
+.search-wrapper { flex: 2 1 350px; min-width: 300px; max-width: 600px; }
+
+.search-label, .date-label {
+  display: block;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  margin-bottom: 8px;
+  font-weight: 500;
+}
+
+.search-input, .date-input {
+  width: 100%;
+  padding: 12px 16px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 1rem;
+  color: var(--text);
+  background-color: #fff;
+  transition: all 0.2s ease;
+}
+
+.search-input:focus, .date-input:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.table-wrapper {
+  overflow-x: auto;
+  border-radius: 12px;
+  box-shadow: 0 4px 6px rgba(0,0,0,0.03);
+  background: var(--surface);
+  max-height: calc(100vh - 220px);
+  overflow-y: auto;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 900px;
+}
+.select-control {
+  padding: 8px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+}
+
+.checkboxes-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.label-inline {
+  font-weight: 600;
+  margin-right: 10px;
+  color: #333;
+}
+
+.checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+  font-size: 0.95rem;
+}
+
+.checkbox-label input[type="checkbox"] {
+  cursor: pointer;
+}
+
+th, td {
+  padding: 12px 16px;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+}
+
+thead tr { background-color: #f9fafb; }
+
+th {
+  cursor: pointer;
+  user-select: none;
+  position: relative;
+  color: var(--text-secondary);
+  font-weight: 600;
+  padding-right: 24px;
+}
+th:hover { color: var(--text); }
+
+th::after {
+  content: '';
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 0; height: 0;
+  border-left: 5px solid transparent;
+  border-right: 5px solid transparent;
+  border-top: 6px solid var(--text-secondary);
+  opacity: 0.3;
+  transition: opacity 0.2s, border-color 0.2s;
+}
+th.sorted-asc::after { border-top-color: var(--primary); opacity: 1; }
+th.sorted-desc::after {
+  border-top-color: transparent;
+  border-bottom: 6px solid var(--primary);
+  opacity: 1;
+}
+
+tbody tr:hover { background-color: #fcfcfc; }
+.price { font-weight: 600; color: var(--success); }
+.shpi { font-family: monospace; font-weight: 600; color: #1e293b; }
+.pagination {
+  margin-top: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  font-size: 0.95rem;
+}
+
+.page-link {
+  padding: 6px 12px;
+  border: 1px solid #ccc;
+  background: #fff;
+  color: #333;
+  text-decoration: none;
+  border-radius: 4px;
+}
+
+.page-link:hover {
+  background: #f5f5f5;
+  color: #000;
+}
+
+.page-info {
+  color: #555;
+}
