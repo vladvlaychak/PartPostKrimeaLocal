@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Учёт отправлений — PartPostCrimea</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+  <div id="app">
+    <h1>Учёт отправлений — PartPostCrimea</h1>
+
+    <div class="flash-messages">
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+          {% for category, message in messages %}
+            <div class="flash flash-{{ category }}">{{ message }}</div>
+          {% endfor %}
+        {% endif %}
+      {% endwith %}
+    </div>
+
+    <!-- Панель фильтров -->
+    <form method="get" action="{{ url_for('index') }}" class="controls-group" id="filtersForm">
+      <!-- Поиск без кнопки (автоматически при вводе) -->
+      <div class="control-item search-wrapper">
+        <label for="searchInput" class="search-label">Поиск</label>
+        <input type="text" id="searchInput" name="search" value="{{ search or '' }}"
+               placeholder="Начните вводить..." autocomplete="off" class="search-input">
+      </div>
+
+      <!-- Даты -->
+      <div class="control-item">
+        <label for="dateFrom" class="date-label">От</label>
+        <input type="date" id="dateFrom" name="dateFrom" value="{{ date_from or '' }}" class="date-input">
+      </div>
+      <div class="control-item">
+        <label for="dateTo" class="date-label">До</label>
+        <input type="date" id="dateTo" name="dateTo" value="{{ date_to or '' }}" class="date-input">
+      </div>
+
+      <!-- Количество строк (выпадающий список) -->
+      <div class="control-item">
+        <label class="date-label">Строк на странице</label>
+        <select name="per_page" class="select-control" onchange="this.form.submit()">
+          <option value="20" {% if per_page == 20 %}selected{% endif %}>20</option>
+          <option value="50" {% if per_page == 50 %}selected{% endif %}>50</option>
+          <option value="100" {% if per_page == 100 %}selected{% endif %}>100</option>
+        </select>
+      </div>
+
+      <!-- Чекбоксы: по каким полям искать -->
+      <div class="control-item checkboxes-wrapper">
+        <span class="label-inline">Искать по:</span>
+        <label class="checkbox-label">
+          <input type="checkbox" name="q_shpi" value="1" {% if q_shpi %}checked{% endif %}> ШПИ
+        </label>
+        <label class="checkbox-label">
+          <input type="checkbox" name="q_recipient" value="1" {% if q_recipient %}checked{% endif %}> Получатель
+        </label>
+        <label class="checkbox-label">
+          <input type="checkbox" name="q_address" value="1" {% if q_address %}checked{% endif %}> Адрес
+        </label>
+        <label class="checkbox-label">
+          <input type="checkbox" name="q_comment" value="1" {% if q_comment %}checked{% endif %}> Комментарий
+        </label>
+      </div>
+    </form>
+
+    <div class="table-wrapper">
+      <table id="shipmentsTable">
+        <thead>
+          <tr>
+            <th data-field="shpi">ШПИ</th>
+            <th data-field="mass">Масса</th>
+            <th data-field="shipping_cost">Стоимость</th>
+            <th data-field="recipient">Получатель</th>
+            <th data-field="phone">Телефон</th>
+            <th data-field="index_code">Индекс</th>
+            <th data-field="address">Адрес</th>
+            <th data-field="internal_number">Внутр.</th>
+            <th data-field="comment">Комментарий</th>
+            <th data-field="uploaded_at">Дата загрузки</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% if shipments %}
+            {% for row in shipments %}
+              <tr>
+                <td class="shpi">{{ row.shpi or '' }}</td>
+                <td>{{ row.mass or '' }}</td>
+                <td class="price">
+                  {% if row.shipping_cost %}
+                    {{ '{:,.0f}'.format(row.shipping_cost) }} ₽
+                  {% else %}
+                    -
+                  {% endif %}
+                </td>
+                <td>{{ row.recipient or '' }}</td>
+                <td>{{ row.phone or '' }}</td>
+                <td>{{ row.index_code or '' }}</td>
+                <td>{{ row.address or '' }}</td>
+                <td>{{ row.internal_number or '' }}</td>
+                <td>{{ row.comment or '' }}</td>
+                <td style="color:#555; font-size: 0.9em;" data-date="{{ row.uploaded_at }}">
+                  {% if row.uploaded_at %}
+                    {{ row.uploaded_at[:19].replace('T', ' ') }}
+                  {% else %}
+                    -
+                  {% endif %}
+                </td>
+              </tr>
+            {% endfor %}
+          {% else %}
+            <tr>
+              <td colspan="10" style="text-align:center; padding: 40px; color: var(--text-secondary);">Нет данных для отображения</td>
+            </tr>
+          {% endif %}
+        </tbody>
+      </table>
+
+      <!-- Пагинация (показывается, если записей больше, чем per_page) -->
+      {% if total_pages > 1 %}
+        <div class="pagination">
+          {% if current_page > 1 %}
+            <a href="{{ url_for('index', page=current_page-1, search=search, dateFrom=date_from, dateTo=date_to, per_page=per_page, q_shpi=q_shpi|default(0), q_recipient=q_recipient|default(0), q_address=q_address|default(0), q_comment=q_comment|default(0)) }}" class="page-link">← Предыдущая</a>
+          {% endif %}
+
+          <span class="page-info">Страница {{ current_page }} из {{ total_pages }} ({{ total_count }} записей)</span>
+
+          {% if current_page < total_pages %}
+            <a href="{{ url_for('index', page=current_page+1, search=search, dateFrom=date_from, dateTo=date_to, per_page=per_page, q_shpi=q_shpi|default(0), q_recipient=q_recipient|default(0), q_address=q_address|default(0), q_comment=q_comment|default(0)) }}" class="page-link">Следующая →</a>
+          {% endif %}
+        </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- JS для автопоиска (debounce) -->
+  <script>
+    const searchInput = document.getElementById('searchInput');
+    const form = document.getElementById('filtersForm');
+
+    if (searchInput && form) {
+      let timeoutId = null;
+      searchInput.addEventListener('input', () => {
+        clearTimeout(timeoutId);
+        timeoutId = setTimeout(() => {
+          form.submit();
+        }, 300); // задержка 300 мс
+      });
+    }
+  </script>
+
+  <script src="{{ url_for('static', filename='js/main.js') }}" defer></script>
+</body>
+</html>
