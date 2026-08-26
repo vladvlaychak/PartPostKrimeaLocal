@@ -74,10 +74,29 @@ document.addEventListener("DOMContentLoaded", () => {
             if (!data.found) {
                 setStatus(data.message || "Ничего не найдено", "status-not-found"); return;
             }
-            const shipments = searchMode === "shpi" ? [data.shipment] : data.shipments;
-            setStatus(shipments.length > 1 ? `Найдено отправлений: ${shipments.length}` : "Отправление найдено", "status-success");
+            const shipments = searchMode === "shpi"
+                ? (data.shipment ? [data.shipment] : [])
+                : (Array.isArray(data.shipments)
+                    ? data.shipments
+                    : (data.shipment ? [data.shipment] : []));
+
+            if (!shipments.length) {
+                setStatus(data.message || "Ничего не найдено", "status-not-found");
+                return;
+            }
+
+            setStatus(
+                shipments.length > 1
+                    ? `Найдено отправлений: ${shipments.length}`
+                    : "Отправление найдено",
+                "status-success"
+            );
+
             renderShipments(shipments);
-            result.scrollIntoView({behavior: "smooth", block: "nearest"});
+            result.scrollIntoView({
+                behavior: "smooth",
+                block: "nearest"
+            });
         } catch (error) {
             console.error(error);
             setStatus(error.message || "Не удалось выполнить поиск", "status-error");
