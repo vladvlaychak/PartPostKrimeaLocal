@@ -1,157 +1,144 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Учёт отправлений — PartPostCrimea</title>
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Учёт отправлений — PartPostCrimea</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
 <body>
-  <div id="app">
-    <h1>Учёт отправлений — PartPostCrimea</h1>
+<div id="app">
+    <header class="app-header">
+        <div class="app-title-group"><h1>Учёт отправлений</h1><p>PartPostCrimea</p></div>
+        <a href="{{ url_for('upload_page') }}" class="upload-link">Загрузить Excel</a>
+    </header>
 
     <div class="flash-messages">
-      {% with messages = get_flashed_messages(with_categories=true) %}
-        {% if messages %}
-          {% for category, message in messages %}
+        {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}{% for category, message in messages %}
             <div class="flash flash-{{ category }}">{{ message }}</div>
-          {% endfor %}
-        {% endif %}
-      {% endwith %}
+        {% endfor %}{% endif %}
+        {% endwith %}
     </div>
 
-    <!-- Панель фильтров -->
+    <section class="shipment-search-card">
+        <div class="shipment-search-heading">
+            <div>
+                <span class="section-kicker">БЫСТРЫЙ ПОИСК</span>
+                <h2>Найти отправление</h2>
+                <p>По номеру отправления (ШПИ) или внутреннему номеру. Регистр букв не учитывается.</p>
+            </div>
+            <div id="statsBadge" class="stats-badge">База загружается...</div>
+        </div>
+
+        <div class="search-mode-switch">
+            <button type="button" class="search-mode active" data-mode="shpi">По ШПИ</button>
+            <button type="button" class="search-mode" data-mode="internal">По внутреннему номеру</button>
+        </div>
+
+        <div class="shipment-search-form">
+            <div class="shipment-input-wrapper">
+                <input type="search" id="shipmentNumber" class="shipment-number-input"
+                       placeholder="Например: RA123456789RU" autocomplete="off"
+                       spellcheck="false" maxlength="100">
+            </div>
+            <button type="button" id="shipmentSearchButton" class="shipment-search-button">Найти</button>
+            <button type="button" id="shipmentClearButton" class="shipment-clear-button"
+                    title="Очистить поиск" aria-label="Очистить поиск">×</button>
+        </div>
+
+        <div id="shipmentSearchStatus" class="shipment-search-status" aria-live="polite"></div>
+        <div id="shipmentSearchResult" class="shipment-search-result" hidden></div>
+    </section>
+
     <form method="get" action="{{ url_for('index') }}" class="controls-group" id="filtersForm">
-      <!-- Поиск без кнопки (автоматически при вводе) -->
-      <div class="control-item search-wrapper">
-        <label for="searchInput" class="search-label">Поиск</label>
-        <input type="text" id="searchInput" name="search" value="{{ search or '' }}"
-               placeholder="Начните вводить..." autocomplete="off" class="search-input">
-      </div>
+        <input type="hidden" name="page" value="1">
 
-      <!-- Даты -->
-      <div class="control-item">
-        <label for="dateFrom" class="date-label">От</label>
-        <input type="date" id="dateFrom" name="dateFrom" value="{{ date_from or '' }}" class="date-input">
-      </div>
-      <div class="control-item">
-        <label for="dateTo" class="date-label">До</label>
-        <input type="date" id="dateTo" name="dateTo" value="{{ date_to or '' }}" class="date-input">
-      </div>
+        <div class="control-item search-wrapper">
+            <label for="searchInput" class="search-label">Общий поиск</label>
+            <input type="search" id="searchInput" name="search" value="{{ search or '' }}"
+                   placeholder="ШПИ, внутренний номер, получатель, адрес..." autocomplete="off" class="search-input">
+        </div>
 
-      <!-- Количество строк (выпадающий список) -->
-      <div class="control-item">
-        <label class="date-label">Строк на странице</label>
-        <select name="per_page" class="select-control" onchange="this.form.submit()">
-          <option value="20" {% if per_page == 20 %}selected{% endif %}>20</option>
-          <option value="50" {% if per_page == 50 %}selected{% endif %}>50</option>
-          <option value="100" {% if per_page == 100 %}selected{% endif %}>100</option>
-        </select>
-      </div>
+        <div class="control-item">
+            <label for="dateFrom" class="date-label">От</label>
+            <input type="date" id="dateFrom" name="dateFrom" value="{{ date_from or '' }}" class="date-input">
+        </div>
 
-      <!-- Чекбоксы: по каким полям искать -->
-      <div class="control-item checkboxes-wrapper">
-        <span class="label-inline">Искать по:</span>
-        <label class="checkbox-label">
-          <input type="checkbox" name="q_shpi" value="1" {% if q_shpi %}checked{% endif %}> ШПИ
-        </label>
-        <label class="checkbox-label">
-          <input type="checkbox" name="q_recipient" value="1" {% if q_recipient %}checked{% endif %}> Получатель
-        </label>
-        <label class="checkbox-label">
-          <input type="checkbox" name="q_address" value="1" {% if q_address %}checked{% endif %}> Адрес
-        </label>
-        <label class="checkbox-label">
-          <input type="checkbox" name="q_comment" value="1" {% if q_comment %}checked{% endif %}> Комментарий
-        </label>
-      </div>
+        <div class="control-item">
+            <label for="dateTo" class="date-label">До</label>
+            <input type="date" id="dateTo" name="dateTo" value="{{ date_to or '' }}" class="date-input">
+        </div>
+
+        <div class="control-item per-page-control">
+            <label class="date-label">Строк на странице</label>
+            <select name="per_page" class="select-control" onchange="this.form.submit()">
+                <option value="20" {% if per_page == 20 %}selected{% endif %}>20</option>
+                <option value="50" {% if per_page == 50 %}selected{% endif %}>50</option>
+                <option value="100" {% if per_page == 100 %}selected{% endif %}>100</option>
+                <option value="200" {% if per_page == 200 %}selected{% endif %}>200</option>
+            </select>
+        </div>
+
+        <div class="control-item checkboxes-wrapper">
+            <span class="label-inline">Искать только в:</span>
+            <label class="checkbox-label"><input type="checkbox" name="q_shpi" value="1" {% if q_shpi %}checked{% endif %}>ШПИ</label>
+            <label class="checkbox-label"><input type="checkbox" name="q_internal_number" value="1" {% if q_internal_number %}checked{% endif %}>Внутр. номер</label>
+            <label class="checkbox-label"><input type="checkbox" name="q_recipient" value="1" {% if q_recipient %}checked{% endif %}>Получатель</label>
+            <label class="checkbox-label"><input type="checkbox" name="q_address" value="1" {% if q_address %}checked{% endif %}>Адрес</label>
+            <label class="checkbox-label"><input type="checkbox" name="q_comment" value="1" {% if q_comment %}checked{% endif %}>Комментарий</label>
+        </div>
+
+        <div class="filter-actions">
+            <button type="submit" class="filter-button">Применить</button>
+            <a href="{{ url_for('index') }}" class="reset-button">Сбросить</a>
+        </div>
     </form>
 
-    <div class="table-wrapper">
-      <table id="shipmentsTable">
-        <thead>
-          <tr>
-            <th data-field="shpi">ШПИ</th>
-            <th data-field="mass">Масса</th>
-            <th data-field="shipping_cost">Стоимость</th>
-            <th data-field="recipient">Получатель</th>
-            <th data-field="phone">Телефон</th>
-            <th data-field="index_code">Индекс</th>
-            <th data-field="address">Адрес</th>
-            <th data-field="internal_number">Внутр.</th>
-            <th data-field="comment">Комментарий</th>
-            <th data-field="uploaded_at">Дата загрузки</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% if shipments %}
-            {% for row in shipments %}
-              <tr>
-                <td class="shpi">{{ row.shpi or '' }}</td>
-                <td>{{ row.mass or '' }}</td>
-                <td class="price">
-                  {% if row.shipping_cost %}
-                    {{ '{:,.0f}'.format(row.shipping_cost) }} ₽
-                  {% else %}
-                    -
-                  {% endif %}
-                </td>
-                <td>{{ row.recipient or '' }}</td>
-                <td>{{ row.phone or '' }}</td>
-                <td>{{ row.index_code or '' }}</td>
-                <td>{{ row.address or '' }}</td>
-                <td>{{ row.internal_number or '' }}</td>
-                <td>{{ row.comment or '' }}</td>
-                <td style="color:#555; font-size: 0.9em;" data-date="{{ row.uploaded_at }}">
-                  {% if row.uploaded_at %}
-                    {{ row.uploaded_at[:19].replace('T', ' ') }}
-                  {% else %}
-                    -
-                  {% endif %}
-                </td>
-              </tr>
-            {% endfor %}
-          {% else %}
-            <tr>
-              <td colspan="10" style="text-align:center; padding: 40px; color: var(--text-secondary);">Нет данных для отображения</td>
-            </tr>
-          {% endif %}
-        </tbody>
-      </table>
-
-      <!-- Пагинация (показывается, если записей больше, чем per_page) -->
-      {% if total_pages > 1 %}
-        <div class="pagination">
-          {% if current_page > 1 %}
-            <a href="{{ url_for('index', page=current_page-1, search=search, dateFrom=date_from, dateTo=date_to, per_page=per_page, q_shpi=q_shpi|default(0), q_recipient=q_recipient|default(0), q_address=q_address|default(0), q_comment=q_comment|default(0)) }}" class="page-link">← Предыдущая</a>
-          {% endif %}
-
-          <span class="page-info">Страница {{ current_page }} из {{ total_pages }} ({{ total_count }} записей)</span>
-
-          {% if current_page < total_pages %}
-            <a href="{{ url_for('index', page=current_page+1, search=search, dateFrom=date_from, dateTo=date_to, per_page=per_page, q_shpi=q_shpi|default(0), q_recipient=q_recipient|default(0), q_address=q_address|default(0), q_comment=q_comment|default(0)) }}" class="page-link">Следующая →</a>
-          {% endif %}
-        </div>
-      {% endif %}
+    <div class="table-header">
+        <div><h2>Список отправлений</h2><p>Найдено записей: <strong>{{ total_count }}</strong></p></div>
+        <div class="page-summary">Страница {{ current_page }} из {{ total_pages }}</div>
     </div>
-  </div>
 
-  <!-- JS для автопоиска (debounce) -->
-  <script>
-    const searchInput = document.getElementById('searchInput');
-    const form = document.getElementById('filtersForm');
+    <div class="table-wrapper">
+        <table id="shipmentsTable">
+            <thead><tr>
+                <th>ШПИ</th><th>Масса</th><th>Стоимость</th><th>Получатель</th>
+                <th>Телефон</th><th>Индекс</th><th>Адрес</th><th>Внутр.</th>
+                <th>Комментарий</th><th>Дата загрузки</th>
+            </tr></thead>
+            <tbody>
+            {% if shipments %}
+                {% for row in shipments %}
+                <tr>
+                    <td class="shpi"><button type="button" class="shpi-button" data-shpi="{{ row.shpi or '' }}">{{ row.shpi or '' }}</button></td>
+                    <td>{{ row.mass or '' }}</td>
+                    <td class="price">{% if row.shipping_cost is not none %}{{ '{:,.0f}'.format(row.shipping_cost) }} ₽{% else %}—{% endif %}</td>
+                    <td>{{ row.recipient or '' }}</td><td>{{ row.phone or '' }}</td><td>{{ row.index_code or '' }}</td>
+                    <td>{{ row.address or '' }}</td>
+                    <td>{{ row.internal_number or '' }}</td><td>{{ row.comment or '' }}</td>
+                    <td class="uploaded-at">{% if row.uploaded_at %}{{ row.uploaded_at[:19].replace('T', ' ') }}{% else %}—{% endif %}</td>
+                </tr>
+                {% endfor %}
+            {% else %}
+                <tr><td colspan="10" class="empty-table">Нет данных для отображения</td></tr>
+            {% endif %}
+            </tbody>
+        </table>
+    </div>
 
-    if (searchInput && form) {
-      let timeoutId = null;
-      searchInput.addEventListener('input', () => {
-        clearTimeout(timeoutId);
-        timeoutId = setTimeout(() => {
-          form.submit();
-        }, 300); // задержка 300 мс
-      });
-    }
-  </script>
-
-  <script src="{{ url_for('static', filename='js/main.js') }}" defer></script>
+    {% if total_pages > 1 %}
+    <nav class="pagination">
+        {% if current_page > 1 %}
+        <a href="{{ url_for('index', page=current_page-1, search=search, dateFrom=date_from, dateTo=date_to, per_page=per_page, q_shpi=1 if q_shpi else None, q_internal_number=1 if q_internal_number else None, q_recipient=1 if q_recipient else None, q_address=1 if q_address else None, q_comment=1 if q_comment else None, sortBy=sortBy, order=order) }}" class="page-link">← Предыдущая</a>
+        {% endif %}
+        <span class="page-info">Страница {{ current_page }} / {{ total_pages }}</span>
+        {% if current_page < total_pages %}
+        <a href="{{ url_for('index', page=current_page+1, search=search, dateFrom=date_from, dateTo=date_to, per_page=per_page, q_shpi=1 if q_shpi else None, q_internal_number=1 if q_internal_number else None, q_recipient=1 if q_recipient else None, q_address=1 if q_address else None, q_comment=1 if q_comment else None, sortBy=sortBy, order=order) }}" class="page-link">Следующая →</a>
+        {% endif %}
+    </nav>
+    {% endif %}
+</div>
+<script src="{{ url_for('static', filename='js/main.js') }}" defer></script>
 </body>
 </html>
