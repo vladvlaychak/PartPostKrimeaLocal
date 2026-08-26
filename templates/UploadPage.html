@@ -1012,8 +1012,21 @@ async function pollStatuses() {
 
         } else {
 
+          const errorDetails = errors
+            .map(job => {
+              const filename = job.filename || "Неизвестный файл";
+              
+                const message = 
+                job.message ||
+                job.error ||
+                "Причина ошибки не указана"; 
+
+            return `X ${filename}: ${message}`;
+            })
+            const successCount = total - errors.length;
+
             showResult(
-                `⚠ Обработка завершена. Успешно: ${total - errors.length}, ошибок: ${errors.length}`,
+                `⚠ Обработка завершена. Успешно: ${successCount}, ошибок: ${errors.length}`,
                 false
             );
 
@@ -1183,7 +1196,14 @@ function getStatusText(
 
         case "error":
 
-            return "✗ Ошибка";
+            return ("✗" + 
+            (
+              job.message 
+              || 
+              job.error 
+              || 
+              "Ошибка"
+          ));
 
 
         default:
