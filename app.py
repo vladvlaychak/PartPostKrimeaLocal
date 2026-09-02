@@ -157,38 +157,38 @@ def index():
     params = []
 
     if search:
-    search_pattern = f"%{search}%"
-    fields_to_search = []
+        search_pattern = f"%{search}%"
+        fields_to_search = []
 
-    if q_shpi:
-        fields_to_search.append("shpi LIKE ?")
-        params.append(search_pattern)
+        if q_shpi:
+            fields_to_search.append("shpi LIKE ?")
+            params.append(search_pattern)
 
-    if q_recipient:
-        fields_to_search.append("recipient LIKE ?")
-        params.append(search_pattern)
+        if q_recipient:
+            fields_to_search.append("recipient LIKE ?")
+            params.append(search_pattern)
 
-    if q_address:
-        fields_to_search.append("address LIKE ?")
-        params.append(search_pattern)
+        if q_address:
+            fields_to_search.append("address LIKE ?")
+            params.append(search_pattern)
 
-    if q_comment:
-        fields_to_search.append("comment LIKE ?")
-        params.append(search_pattern)
+        if q_comment:
+            fields_to_search.append("comment LIKE ?")
+            params.append(search_pattern)
 
-    # Поиск по внутреннему (исходящему) номеру
-    internal_search = normalize_internal_number(search)
+        # Поиск по внутреннему (исходящему) номеру
+        internal_search = normalize_internal_number(search)
 
-    if internal_search:
-        fields_to_search.append(
-            "internal_number_normalized LIKE ?"
-        )
-        params.append(f"%{internal_search}%")
+        if internal_search:
+            fields_to_search.append(
+                "internal_number_normalized LIKE ?"
+            )
+            params.append(f"%{internal_search}%")
 
-    if fields_to_search:
-        where_clauses.append(
-            "(" + " OR ".join(fields_to_search) + ")"
-        )
+        if fields_to_search:
+            where_clauses.append(
+                "(" + " OR ".join(fields_to_search) + ")"
+            )
 
     if date_from:
 
