@@ -21,6 +21,7 @@ from config import (
 from db import (
     init_db,
     get_db_connection,
+    normalize_internal_number,
 )
 
 from watchdog_handler import start_watchdog
@@ -156,62 +157,38 @@ def index():
     params = []
 
     if search:
+    search_pattern = f"%{search}%"
+    fields_to_search = []
 
-        search_pattern = (
-            f"%{search}%"
+    if q_shpi:
+        fields_to_search.append("shpi LIKE ?")
+        params.append(search_pattern)
+
+    if q_recipient:
+        fields_to_search.append("recipient LIKE ?")
+        params.append(search_pattern)
+
+    if q_address:
+        fields_to_search.append("address LIKE ?")
+        params.append(search_pattern)
+
+    if q_comment:
+        fields_to_search.append("comment LIKE ?")
+        params.append(search_pattern)
+
+    # Поиск по внутреннему (исходящему) номеру
+    internal_search = normalize_internal_number(search)
+
+    if internal_search:
+        fields_to_search.append(
+            "internal_number_normalized LIKE ?"
         )
+        params.append(f"%{internal_search}%")
 
-        fields_to_search = []
-
-        if q_shpi:
-
-            fields_to_search.append(
-                "shpi LIKE ?"
-            )
-
-            params.append(
-                search_pattern
-            )
-
-        if q_recipient:
-
-            fields_to_search.append(
-                "recipient LIKE ?"
-            )
-
-            params.append(
-                search_pattern
-            )
-
-        if q_address:
-
-            fields_to_search.append(
-                "address LIKE ?"
-            )
-
-            params.append(
-                search_pattern
-            )
-
-        if q_comment:
-
-            fields_to_search.append(
-                "comment LIKE ?"
-            )
-
-            params.append(
-                search_pattern
-            )
-
-        if fields_to_search:
-
-            where_clauses.append(
-                "("
-                + " OR ".join(
-                    fields_to_search
-                )
-                + ")"
-            )
+    if fields_to_search:
+        where_clauses.append(
+            "(" + " OR ".join(fields_to_search) + ")"
+        )
 
     if date_from:
 
@@ -957,12 +934,6 @@ def api_shipment():
 
 @app.route("/api/internal-number", methods=["GET"])
 def api_internal_number():
-    """
-    Поиск отправления по внутреннему номеру.
-    Пример:
-        /api/internal-number?number=12345
-    """
-
     number = request.args.get(
         "number",
         "",
@@ -972,7 +943,18 @@ def api_internal_number():
         return jsonify({
             "success": False,
             "error": "Не указан внутренний номер",
-            "shipment": None,
+            "shipments": [],
+            "count": 0,
+        }), 400
+
+    normalized_number = normalize_internal_number(number)
+
+    if not normalized_number:
+        return jsonify({
+            "success": False,
+            "error": "Не указан внутренний номер",
+            "shipments": [],
+            "count": 0,
         }), 400
 
     conn = get_db_connection()
@@ -980,52 +962,35 @@ def api_internal_number():
     try:
         cur = conn.cursor()
 
-        # В разных версиях БД поле может называться
-        # internal_number или number.
-        #
-        # Сначала пробуем internal_number.
+        cur.execute(
+            """
+            SELECT *
+            FROM shipments
+            WHERE internal_number_normalized = ?
+            ORDER BY id DESC
+            """,
+            (normalized_number,),
+        )
 
-        try:
+        rows = cur.fetchall()
 
-            cur.execute(
-                """
-                SELECT *
-                FROM shipments
-                WHERE internal_number = ?
-                LIMIT 1
-                """,
-                (number,),
-            )
+        shipments = [dict(row) for row in rows]
 
-            row = cur.fetchone()
-
-        except Exception:
-
-            # Совместимость со старой схемой БД
-
-            cur.execute(
-                """
-                SELECT *
-                FROM shipments
-                WHERE number = ?
-                LIMIT 1
-                """,
-                (number,),
-            )
-
-            row = cur.fetchone()
-
-        if row is None:
+        if not shipments:
             return jsonify({
                 "success": True,
                 "found": False,
-                "shipment": None,
+                "shipments": [],
+                "count": 0,
+                "message": "Отправления с таким внутренним номером не найдены",
             })
 
         return jsonify({
             "success": True,
             "found": True,
-            "shipment": dict(row),
+            "shipments": shipments,
+            "count": len(shipments),
+            "message": f"Найдено отправлений: {len(shipments)}",
         })
 
     finally:
